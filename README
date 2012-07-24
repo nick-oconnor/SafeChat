@@ -1,0 +1,12 @@
+SafeChat is a open-source secure chat and file transfer program.
+
+SafeChat Built Requirements:
+GNU Make
+GNU C++ Compiler (g++)
+OpenSSL Development Libraries
+
+Build Instructions:
+"Cd" to the folder containing the makefile and main.cpp.
+Enter "make build" to compile.
+Enter "sudo make install" to install SafeChat to /usr/bin/.
+Enter "safechat --help" to view the required flags (these flags only need to be provided once, as SafeChat saves the last used preferences).
