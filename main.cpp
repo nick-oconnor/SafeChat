@@ -78,18 +78,6 @@ private:
         }
     };
 
-    class Host {
-    public:
-
-        long _id;
-        std::string _name;
-
-        Host(long id, const std::string name) {
-            _id = id;
-            _name = name;
-        }
-    };
-
     int _port, _socket, _key_size;
     unsigned char *_key;
     std::string _config_path, _name, _server, _download_path, _peer_name;
@@ -125,7 +113,7 @@ public:
             }
             config_stream.close();
         }
-        for (int i = 1; i < argc; ++i) {
+        for (int i = 1; i < argc; i++) {
             if (!strcmp(argv[i], "-n") && i + 1 < argc) {
                 _name = argv[++i];
             }
@@ -234,10 +222,9 @@ public:
 
     void start_client() {
 
-        int choice, response;
-        long hosts_num, id;
+        int hosts_num, socket, choice, response;
         std::string string;
-        std::vector<Host> hosts;
+        std::vector< std::pair<int, std::string> > hosts;
         DH *dh;
         BIGNUM *public_key = BN_new();
         Block block(__null);
@@ -257,21 +244,21 @@ public:
             }
             else {
                 hosts.clear();
-                for (int i = 0; i < hosts_num; ++i) {
-                    id = Recv(block).num();
-                    hosts.push_back(Host(id, Recv(block).str()));
+                for (int i = 0; i < hosts_num; i++) {
+                    socket = Recv(block).num();
+                    hosts.push_back(std::make_pair(socket, Recv(block).str()));
                 }
                 do {
                     std::cout << "\n\nAvailable hosts:\n\n" << std::flush;
-                    for (int i = 0; i < hosts_num; ++i) {
-                        std::cout << "\t" << i + 1 << ") " << hosts[i]._name << "\n" << std::flush;
+                    for (int i = 0; i < hosts_num; i++) {
+                        std::cout << "\t" << i + 1 << ") " << hosts[i].second << "\n" << std::flush;
                     }
                     std::cout << "\nChoice: ";
                     std::getline(std::cin, string);
                     choice = atoi(string.c_str());
                 } while (choice < 1 || choice > hosts_num);
-                _peer_name = hosts[choice - 1]._name;
-                Send(Block(__try_host, int2str(hosts[choice - 1]._id)));
+                _peer_name = hosts[choice - 1].second;
+                Send(Block(__try_host, int2str(hosts[choice - 1].first)));
                 std::cout << "\nWaiting for " << _peer_name << " to accept your connection... " << std::flush;
                 response = Recv(block).cmd();
                 if (response == __decline_client) {
@@ -349,7 +336,6 @@ private:
     }
 
     void console() {
-
         std::cout << "\n\nSupported commands:\n\n\t/file - send file\n\t/quit - disconnect\n\n" << std::flush;
         pthread_create(&_outbound, &_attr, &LocalHost::outbound, this);
         pthread_create(&_inbound, &_attr, &LocalHost::inbound, this);
@@ -373,13 +359,13 @@ private:
             if (string == "/file") {
                 std::cout << "Enter file path: " << std::flush;
                 std::getline(std::cin, file_path);
-                for (int i = 0; file_path[i] == ' ' || file_path[i] == '\'' || file_path[i] == '\"'; ++i) {
+                for (int i = 0; file_path[i] == ' ' || file_path[i] == '\'' || file_path[i] == '\"'; i++) {
                     file_path.erase(file_path.begin() + i);
                 }
                 for (int i = file_path.size() - 1; file_path[i] == ' ' || file_path[i] == '\'' || file_path[i] == '\"'; i--) {
                     file_path.erase(file_path.begin() + i);
                 }
-                for (size_t i = 0; i < file_path.size(); ++i) {
+                for (size_t i = 0; i < file_path.size(); i++) {
                     if (file_path[i] == '\\') {
                         file_path.erase(file_path.begin() + i);
                     }
@@ -523,7 +509,7 @@ private:
     }
 
     Block &Encrypt(Block &block) {
-        for (int i = 1; i < __block_size - 1; ++i) {
+        for (int i = 1; i < __block_size - 1; i++) {
             block._data[i] ^= random() % 255;
         }
         return block;
