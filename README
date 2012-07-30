@@ -2,5 +2,5 @@ SafeChat is a open-source secure chat and file transfer program.
 
 SafeChat Build Requirements:
 GNU Make
-GNU C++ Compiler (g++)
+GNU C++ Compiler
 OpenSSL Development Libraries
