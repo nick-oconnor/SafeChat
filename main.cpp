@@ -100,14 +100,11 @@ public:
             while (std::getline(config_stream, line)) {
                 if (line.substr(0, 11) == "local_name=") {
                     _name = line.substr(11);
-                }
-                else if (line.substr(0, 7) == "server=") {
+                } else if (line.substr(0, 7) == "server=") {
                     _server = line.substr(7);
-                }
-                else if (line.substr(0, 5) == "port=") {
+                } else if (line.substr(0, 5) == "port=") {
                     _port = atoi(line.substr(5).c_str());
-                }
-                else if (line.substr(0, 14) == "download_path=") {
+                } else if (line.substr(0, 14) == "download_path=") {
                     _download_path = line.substr(14);
                 }
             }
@@ -116,21 +113,16 @@ public:
         for (int i = 1; i < argc; i++) {
             if (!strcmp(argv[i], "-n") && i + 1 < argc) {
                 _name = argv[++i];
-            }
-            else if (!strcmp(argv[i], "-s") && i + 1 < argc) {
+            } else if (!strcmp(argv[i], "-s") && i + 1 < argc) {
                 _server = argv[++i];
-            }
-            else if (!strcmp(argv[i], "-p") && i + 1 < argc) {
+            } else if (!strcmp(argv[i], "-p") && i + 1 < argc) {
                 _port = atoi(argv[++i]);
-            }
-            else if (!strcmp(argv[i], "-d") && i + 1 < argc) {
+            } else if (!strcmp(argv[i], "-d") && i + 1 < argc) {
                 _download_path = argv[++i];
-            }
-            else if (!strcmp(argv[i], "--help")) {
+            } else if (!strcmp(argv[i], "--help")) {
                 std::cerr << "SafeChat - (c) 2012 Nicholas Pitt \nhttps://www.xphysics.net/\n\n\t-n <name> Name forwarded to the safechat server.\n\t\t\t(if the name includes spaces, use quotes)\n\t-s <serv> DNS name or IP address of a safechat server.\n\t-p <port> Port the safechat server is running on.\n\t\t\t(from 1 to 65535)\n\t-d <path> Downloads directory.\n\t\t\t(path format is system specific, use quotes)\n\t--help    Displays this message.\n";
                 exit(EXIT_SUCCESS);
-            }
-            else {
+            } else {
                 std::cerr << "Invalid argument (" << argv[i] << "). Enter \"safechat --help\" for details.\n";
                 exit(EXIT_SUCCESS);
             }
@@ -163,8 +155,7 @@ public:
         std::ofstream config_stream(_config_path.c_str());
         if (!config_stream) {
             std::cerr << "Error writing configuration file to " << _config_path << ".\n";
-        }
-        else {
+        } else {
             config_stream << "Configuration file for SafeChat\n\nlocal_name=" << _name << "\nserver=" << _server << "\nport=" << _port << "\ndownload_path=" << _download_path;
             config_stream.close();
         }
@@ -194,8 +185,7 @@ public:
                 std::getline(std::cin, choice);
                 if (choice == "n" || choice == "n") {
                     Send(Block(__decline_client, int2str(id)));
-                }
-                else if (choice == "y" || choice == "Y") {
+                } else if (choice == "y" || choice == "Y") {
                     Send(Block(__accept_client, int2str(id)));
                     std::cout << "Generating session key... " << std::flush;
                     dh = DH_generate_parameters(__key_length, 5, NULL, NULL);
@@ -241,8 +231,7 @@ public:
                 std::cout << "\n\nAvailable hosts:\n\n" << std::flush;
                 std::cout << "\t(none)\n\n" << std::flush;
                 return;
-            }
-            else {
+            } else {
                 hosts.clear();
                 for (int i = 0; i < hosts_num; i++) {
                     socket = Recv(block).num();
@@ -263,8 +252,7 @@ public:
                 response = Recv(block).cmd();
                 if (response == __decline_client) {
                     std::cout << _peer_name << " declined your connection." << std::flush;
-                }
-                else if (response == __accept_client) {
+                } else if (response == __accept_client) {
                     std::cout << "Done\nGenerating session key... " << std::flush;
                     dh = DH_generate_parameters(__key_length, 5, NULL, NULL);
                     BN_hex2bn(&dh->p, (char *) Recv(block).bin());
@@ -373,8 +361,7 @@ private:
                 file_stream = fopen(file_path.c_str(), "rb");
                 if (!file_stream) {
                     std::cerr << "Error opening " << file_path << ".\n";
-                }
-                else {
+                } else {
                     block = Block(__send_data, string);
                     Send(Encrypt(block));
                     file_name = file_path.substr(file_path.rfind("/") + 1);
@@ -398,8 +385,7 @@ private:
                         }
                         if (file_size - ftell(file_stream) >= __block_size - 1) {
                             fread((void *) block.bin(), 1, __block_size - 1, file_stream);
-                        }
-                        else {
+                        } else {
                             fread((void *) block.bin(), 1, file_size - ftell(file_stream), file_stream);
                         }
                         Send(Encrypt(block));
@@ -408,17 +394,14 @@ private:
                     fclose(file_stream);
                     std::cout << "\n" << std::flush;
                 }
-            }
-            else if (string == "/quit") {
+            } else if (string == "/quit") {
                 Send(Block(__null));
                 std::cout << "\r" << std::string(_name.size() + 1, ' ') << "\nDisconnected.\n\n" << std::flush;
                 pthread_kill(_inbound, SIGTERM);
                 pthread_exit(NULL);
-            }
-            else if (string[0] == '/') {
+            } else if (string[0] == '/') {
                 std::cerr << "Invalid command " << string << ".\n";
-            }
-            else {
+            } else {
                 block = Block(__send_data, string);
                 Send(Encrypt(block));
             }
@@ -446,8 +429,7 @@ private:
                 if (!file_stream) {
                     std::cerr << "Error creating " << file_path << ".\n";
                     raise(SIGINT);
-                }
-                else {
+                } else {
                     file_size = Encrypt(Recv(block)).num();
                     time(&start_time);
                     time(&last_update);
@@ -463,12 +445,10 @@ private:
                         if (block.cmd() == __send_data) {
                             if (file_size - ftell(file_stream) >= __block_size - 1) {
                                 fwrite((void *) Encrypt(block).bin(), 1, __block_size - 1, file_stream);
-                            }
-                            else {
+                            } else {
                                 fwrite((void *) Encrypt(block).bin(), 1, file_size - ftell(file_stream), file_stream);
                             }
-                        }
-                        else {
+                        } else {
                             std::cout << "\n\n" << _peer_name << " disconnected.\n\n" << std::flush;
                             pthread_kill(_outbound, SIGTERM);
                             pthread_exit(NULL);
@@ -478,13 +458,11 @@ private:
                     fclose(file_stream);
                 }
                 pthread_mutex_unlock(&_mutex);
-            }
-            else if (block.cmd() == __send_data) {
+            } else if (block.cmd() == __send_data) {
                 pthread_mutex_lock(&_mutex);
                 std::cout << "\r" << std::string(_name.size() + 1, ' ') << "\r" << _peer_name << ": " << block.str() << "\n" << _name << ": " << std::flush;
                 pthread_mutex_unlock(&_mutex);
-            }
-            else {
+            } else {
                 std::cout << "\n\n" << _peer_name << " disconnected.\n\n" << std::flush;
                 pthread_kill(_outbound, SIGTERM);
                 pthread_exit(NULL);
@@ -531,12 +509,10 @@ private:
         if (rate / (1024 * 1024) >= 1) {
             string_stream << rate / (1024 * 1024);
             string += string_stream.str() + "MB/s";
-        }
-        else if (rate / 1024 >= 1) {
+        } else if (rate / 1024 >= 1) {
             string_stream << rate / 1024;
             string += string_stream.str() + "KB/s";
-        }
-        else {
+        } else {
             string_stream << rate;
             string += string_stream.str() + "B/s";
         }
@@ -551,12 +527,10 @@ private:
         if (seconds / (60 * 60) >= 1) {
             string_stream << seconds / (60 * 60);
             string += string_stream.str() + "hrs";
-        }
-        else if (seconds / 60 >= 1) {
+        } else if (seconds / 60 >= 1) {
             string_stream << seconds / 60;
             string += string_stream.str() + "min";
-        }
-        else {
+        } else {
             string_stream << seconds;
             string += string_stream.str() + "sec";
         }
@@ -585,8 +559,7 @@ int main(int argc, char *argv[]) {
         choice = atoi(string.c_str());
         if (choice == 1) {
             local_host->start_host();
-        }
-        else if (choice == 2) {
+        } else if (choice == 2) {
             local_host->start_client();
         }
     } while (choice < 1 || choice > 2);
