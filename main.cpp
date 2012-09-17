@@ -27,7 +27,6 @@
 #include <openssl/bn.h>
 #define __timeout 30
 #define __block_size 1024
-#define __key_length 256
 #define __null 0
 #define __keep_alive 1
 #define __set_name 2
@@ -37,8 +36,9 @@
 #define __decline_client 6
 #define __accept_client 7
 #define __send_data 8
+#define __key_length 256
 
-class LocalHost {
+class Client {
 private:
 
     class Block {
@@ -61,11 +61,20 @@ private:
             strncpy((char *) &_data[1], c_string, __block_size - 1);
         }
 
+        Block(int cmd, const long num) {
+
+            std::stringstream string_stream;
+
+            string_stream << num;
+            _data[0] = (unsigned char) cmd;
+            strncpy((char *) &_data[1], string_stream.str().c_str(), __block_size - 1);
+        }
+
         int cmd() const {
             return (int) _data[0];
         }
 
-        const unsigned char *bin() const {
+        const unsigned char *c_str() const {
             return &_data[1];
         }
 
@@ -87,7 +96,7 @@ private:
 
 public:
 
-    LocalHost(int argc, char *argv[]) {
+    Client(int argc, char *argv[]) {
 
         std::string line;
 
@@ -148,7 +157,7 @@ public:
         }
     }
 
-    ~LocalHost() {
+    ~Client() {
         pthread_mutex_unlock(&_mutex);
         pthread_mutex_destroy(&_mutex);
         pthread_attr_destroy(&_attr);
@@ -171,7 +180,7 @@ public:
 
         std::cout << "\nConnecting to " << _server << " on port " << _port << "... " << std::flush;
         Socket();
-        pthread_create(&_keep_alive, NULL, &LocalHost::keep_alive, this);
+        pthread_create(&_keep_alive, NULL, &Client::keep_alive, this);
         Send(Block(__set_name, _name));
         Send(Block(__set_available));
         std::cout << "Done" << std::flush;
@@ -184,15 +193,15 @@ public:
                 std::cout << "\nAccept connection from " << _peer_name << "? (y/n) " << std::flush;
                 std::getline(std::cin, choice);
                 if (choice == "n" || choice == "n") {
-                    Send(Block(__decline_client, int2str(id)));
+                    Send(Block(__decline_client, id));
                 } else if (choice == "y" || choice == "Y") {
-                    Send(Block(__accept_client, int2str(id)));
+                    Send(Block(__accept_client, id));
                     std::cout << "Generating session key... " << std::flush;
                     dh = DH_generate_parameters(__key_length, 5, NULL, NULL);
                     Send(Block(__send_data, BN_bn2hex(dh->p)));
                     DH_generate_key(dh);
                     Send(Block(__send_data, BN_bn2hex(dh->pub_key)));
-                    BN_hex2bn(&public_key, (char *) Recv(block).bin());
+                    BN_hex2bn(&public_key, (char *) Recv(block).c_str());
                     _key_size = DH_size(dh);
 
                     _key = new unsigned char[_key_size];
@@ -221,7 +230,7 @@ public:
 
         std::cout << "\nConnecting to " << _server << " on port " << _port << "... " << std::flush;
         Socket();
-        pthread_create(&_keep_alive, NULL, &LocalHost::keep_alive, this);
+        pthread_create(&_keep_alive, NULL, &Client::keep_alive, this);
         Send(Block(__set_name, _name));
         std::cout << "Done" << std::flush;
         do {
@@ -247,7 +256,7 @@ public:
                     choice = atoi(string.c_str());
                 } while (choice < 1 || choice > hosts_num);
                 _peer_name = hosts[choice - 1].second;
-                Send(Block(__try_host, int2str(hosts[choice - 1].first)));
+                Send(Block(__try_host, hosts[choice - 1].first));
                 std::cout << "\nWaiting for " << _peer_name << " to accept your connection... " << std::flush;
                 response = Recv(block).cmd();
                 if (response == __decline_client) {
@@ -255,9 +264,9 @@ public:
                 } else if (response == __accept_client) {
                     std::cout << "Done\nGenerating session key... " << std::flush;
                     dh = DH_generate_parameters(__key_length, 5, NULL, NULL);
-                    BN_hex2bn(&dh->p, (char *) Recv(block).bin());
+                    BN_hex2bn(&dh->p, (char *) Recv(block).c_str());
                     DH_generate_key(dh);
-                    BN_hex2bn(&public_key, (char *) Recv(block).bin());
+                    BN_hex2bn(&public_key, (char *) Recv(block).c_str());
                     Send(Block(__send_data, BN_bn2hex(dh->pub_key)));
                     _key_size = DH_size(dh);
 
@@ -276,16 +285,16 @@ public:
         pthread_kill(_keep_alive, SIGTERM);
     }
 
-    static void *keep_alive(void *local_host) {
-        return ((LocalHost *) local_host)->keep_alive();
+    static void *keep_alive(void *client) {
+        return ((Client *) client)->keep_alive();
     }
 
-    static void *inbound(void *local_host) {
-        return ((LocalHost *) local_host)->inbound();
+    static void *inbound(void *client) {
+        return ((Client *) client)->inbound();
     }
 
-    static void *outbound(void *local_host) {
-        return ((LocalHost *) local_host)->outbound();
+    static void *outbound(void *client) {
+        return ((Client *) client)->outbound();
     }
 
     static void exit(int signal) {
@@ -325,8 +334,8 @@ private:
 
     void console() {
         std::cout << "\n\nSupported commands:\n\n\t/file - send file\n\t/quit - disconnect\n\n" << std::flush;
-        pthread_create(&_outbound, &_attr, &LocalHost::outbound, this);
-        pthread_create(&_inbound, &_attr, &LocalHost::inbound, this);
+        pthread_create(&_outbound, &_attr, &Client::outbound, this);
+        pthread_create(&_inbound, &_attr, &Client::inbound, this);
         pthread_join(_outbound, NULL);
         pthread_join(_inbound, NULL);
     }
@@ -369,7 +378,7 @@ private:
                     Send(Encrypt(block));
                     fseek(file_stream, 0, SEEK_END);
                     file_size = ftell(file_stream);
-                    block = Block(__send_data, int2str(file_size));
+                    block = Block(__send_data, file_size);
                     Send(Encrypt(block));
                     fseek(file_stream, 0, SEEK_SET);
                     time(&start_time);
@@ -384,9 +393,9 @@ private:
                             time(&last_update);
                         }
                         if (file_size - ftell(file_stream) >= __block_size - 1) {
-                            fread((void *) block.bin(), 1, __block_size - 1, file_stream);
+                            fread((void *) block.c_str(), 1, __block_size - 1, file_stream);
                         } else {
-                            fread((void *) block.bin(), 1, file_size - ftell(file_stream), file_stream);
+                            fread((void *) block.c_str(), 1, file_size - ftell(file_stream), file_stream);
                         }
                         Send(Encrypt(block));
                     } while (bytes_sent < file_size);
@@ -444,9 +453,9 @@ private:
                         Recv(block);
                         if (block.cmd() == __send_data) {
                             if (file_size - ftell(file_stream) >= __block_size - 1) {
-                                fwrite((void *) Encrypt(block).bin(), 1, __block_size - 1, file_stream);
+                                fwrite((void *) Encrypt(block).c_str(), 1, __block_size - 1, file_stream);
                             } else {
-                                fwrite((void *) Encrypt(block).bin(), 1, file_size - ftell(file_stream), file_stream);
+                                fwrite((void *) Encrypt(block).c_str(), 1, file_size - ftell(file_stream), file_stream);
                             }
                         } else {
                             std::cout << "\n\n" << _peer_name << " disconnected.\n\n" << std::flush;
@@ -493,14 +502,6 @@ private:
         return block;
     }
 
-    std::string int2str(long num) {
-
-        std::stringstream string_stream;
-
-        string_stream << num;
-        return string_stream.str();
-    }
-
     std::string format_rate(long rate) {
 
         std::string string;
@@ -539,10 +540,10 @@ private:
 
 };
 
-LocalHost *local_host;
+Client *client;
 
 void save_config_wrapper(int signal) {
-    delete local_host;
+    delete client;
     exit(EXIT_SUCCESS);
 }
 
@@ -550,7 +551,7 @@ int main(int argc, char *argv[]) {
 
     int choice;
     std::string string;
-    local_host = new LocalHost(argc, argv);
+    client = new Client(argc, argv);
 
     signal(SIGINT, save_config_wrapper);
     do {
@@ -558,11 +559,11 @@ int main(int argc, char *argv[]) {
         std::getline(std::cin, string);
         choice = atoi(string.c_str());
         if (choice == 1) {
-            local_host->start_host();
+            client->start_host();
         } else if (choice == 2) {
-            local_host->start_client();
+            client->start_client();
         }
     } while (choice < 1 || choice > 2);
-    delete local_host;
+    delete client;
     return 0;
 }
