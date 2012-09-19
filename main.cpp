@@ -158,6 +158,7 @@ public:
     }
 
     ~Client() {
+        close(_socket);
         pthread_mutex_unlock(&_mutex);
         pthread_mutex_destroy(&_mutex);
         pthread_attr_destroy(&_attr);
