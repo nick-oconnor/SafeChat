@@ -497,7 +497,7 @@ private:
     }
 
     Block &Encrypt(Block &block) {
-        for (int i = 1; i < __block_size - 1; i++) {
+        for (int i = 1; i < __block_size; i++) {
             block._data[i] ^= random() % 255;
         }
         return block;
