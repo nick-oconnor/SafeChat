@@ -17,6 +17,8 @@
 #define	block_h
 
 #include <iostream>
+#include <string.h>
+#include <stdlib.h>
 
 class Block {
 public:

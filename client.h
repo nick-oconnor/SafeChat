@@ -16,13 +16,12 @@
 #ifndef client_h
 #define	client_h
 
-#include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <stdlib.h>
 #include <signal.h>
+#include <pthread.h>
 #include <netdb.h>
 #include <openssl/dh.h>
 #include <openssl/bn.h>

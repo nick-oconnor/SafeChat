@@ -13,7 +13,6 @@
   <http://www.gnu.org/licenses/>
  */
 
-#include <iostream>
 #include "client.h"
 
 Client *client;
