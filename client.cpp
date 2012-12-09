@@ -55,28 +55,28 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
             exit(EXIT_SUCCESS);
         } else {
             print_help();
-            std::cerr << "SafeChat: Unknown argument '" << argv[i] << "'\n";
+            std::cerr << "SafeChat: unknown argument '" << argv[i] << "'\n";
             exit(EXIT_FAILURE);
         }
     }
     if (_name.size() < 1) {
         print_help();
-        std::cerr << "SafeChat: Name required\n";
+        std::cerr << "SafeChat: name required\n";
         exit(EXIT_FAILURE);
     }
     if (_server.size() < 1) {
         print_help();
-        std::cerr << "SafeChat: Server required\n";
+        std::cerr << "SafeChat: server required\n";
         exit(EXIT_FAILURE);
     }
     if (_port < 1 || _port > 65535) {
         print_help();
-        std::cerr << "SafeChat: Invalid port number\n";
+        std::cerr << "SafeChat: invalid port number\n";
         exit(EXIT_FAILURE);
     }
     if (_file_path.size() < 1) {
         print_help();
-        std::cerr << "SafeChat: File transfer path required\n";
+        std::cerr << "SafeChat: file transfer path required\n";
         exit(EXIT_FAILURE);
     }
     _file_path = trim_path(_file_path);
