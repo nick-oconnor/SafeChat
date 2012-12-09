@@ -24,7 +24,7 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
     _socket_data = _cin_data = _encryption = false;
     pthread_cond_init(&_cond, NULL);
     pthread_mutex_init(&_mutex, NULL);
-    _config_path = std::string(getenv("HOME")) + "/.SafeChat";
+    _config_path = std::string(getenv("HOME")) + "/.safechat";
     config_file.open(_config_path.c_str());
     if (config_file) {
         while (std::getline(config_file, str)) {
