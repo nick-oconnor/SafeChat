@@ -89,7 +89,6 @@ Client::~Client() {
 
     std::ofstream config_file;
 
-    pthread_kill(_keep_alive, SIGTERM);
     pthread_kill(_socket_listener, SIGTERM);
     pthread_kill(_cin_listener, SIGTERM);
     close(_socket);
@@ -129,8 +128,6 @@ void Client::start() {
         std::cerr << "Error: can't connect to " << _server << ".\n";
         exit(EXIT_FAILURE);
     }
-    time(&_time);
-    pthread_create(&_keep_alive, NULL, &Client::keep_alive, this);
     pthread_create(&_socket_listener, NULL, &Client::socket_listener, this);
     pthread_create(&_cin_listener, NULL, &Client::cin_listener, this);
     if (*(short *) recv_block(block)._data != __version) {
@@ -358,20 +355,6 @@ void Client::console() {
     }
 }
 
-void *Client::keep_alive() {
-
-    Block block(0, NULL, 0);
-
-    signal(SIGTERM, thread_handler);
-    while (true) {
-        sleep(__timeout / 2);
-        if (difftime(time(NULL), _time) >= __timeout / 2) {
-            send_block(block.set(__keep_alive, NULL, 0));
-        }
-    }
-    return NULL;
-}
-
 void *Client::socket_listener() {
     signal(SIGTERM, thread_handler);
     while (true) {
@@ -437,7 +420,6 @@ void Client::send_block(Block &block) {
             exit(EXIT_FAILURE);
         }
     }
-    time(&_time);
 }
 
 Block &Client::recv_block(Block &block) {

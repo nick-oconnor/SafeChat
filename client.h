@@ -27,18 +27,16 @@
 #include <openssl/bn.h>
 #include "block.h"
 
-#define __version               1
-#define __timeout               20
+#define __version               2
 
-#define __keep_alive            1
-#define __set_name              2
-#define __set_available         3
-#define __get_hosts             4
-#define __try_host              5
-#define __decline_client        6
-#define __accept_client         7
-#define __data                  8
-#define __disconnect            9
+#define __set_name              1
+#define __set_available         2
+#define __get_hosts             3
+#define __try_host              4
+#define __decline_client        5
+#define __accept_client         6
+#define __data                  7
+#define __disconnect            8
 
 #define __key_bits              256
 #define __fragment_size         1048576
@@ -52,10 +50,6 @@ public:
     ~Client();
 
     void start();
-
-    static void *keep_alive(void *client) {
-        return ((Client *) client)->keep_alive();
-    }
 
     static void *socket_listener(void *client) {
         return ((Client *) client)->socket_listener();
@@ -73,15 +67,13 @@ private:
 
     bool _socket_data, _cin_data, _encryption;
     int _port, _socket;
-    time_t _time;
-    pthread_t _keep_alive, _socket_listener, _cin_listener;
+    pthread_t _socket_listener, _cin_listener;
     pthread_cond_t _cond;
     pthread_mutex_t _mutex;
     std::string _config_path, _name, _server, _file_path, _peer_name, _str;
     Block _block;
 
     void console();
-    void *keep_alive();
     void *socket_listener();
     void *cin_listener();
     void send_block(Block &block);
