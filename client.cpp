@@ -22,6 +22,7 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
 
     _display_menu = true;
     _socket_data = _cin_data = _encryption = false;
+    time(&_time);
     pthread_cond_init(&_cond, NULL);
     pthread_mutex_init(&_mutex, NULL);
     _config_path = std::string(getenv("HOME")) + "/.safechat";
@@ -88,13 +89,16 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
 Client::~Client() {
 
     std::ofstream config_file;
+    Block block(0, NULL, 0);
 
+    pthread_kill(_keep_alive, SIGTERM);
     pthread_kill(_socket_listener, SIGTERM);
     pthread_kill(_cin_listener, SIGTERM);
+    send_block(block.set(__disconnect, NULL, 0));
     close(_socket);
     pthread_mutex_unlock(&_mutex);
-    pthread_mutex_destroy(&_mutex);
     pthread_cond_destroy(&_cond);
+    pthread_mutex_destroy(&_mutex);
     config_file.open(_config_path.c_str());
     if (!config_file) {
         std::cerr << "Error: can't write '" << _config_path << "'.\n";
@@ -128,6 +132,7 @@ void Client::start() {
         std::cerr << "Error: can't connect to " << _server << ".\n";
         exit(EXIT_FAILURE);
     }
+    pthread_create(&_keep_alive, NULL, &Client::keep_alive, this);
     pthread_create(&_socket_listener, NULL, &Client::socket_listener, this);
     pthread_create(&_cin_listener, NULL, &Client::cin_listener, this);
     if (*(short *) recv_block(block)._data != __version) {
@@ -355,6 +360,20 @@ void Client::console() {
     }
 }
 
+void *Client::keep_alive() {
+
+    Block block(0, NULL, 0);
+
+    signal(SIGTERM, thread_handler);
+    while (true) {
+        sleep(__time_out / 3);
+        if (difftime(_time, time(NULL) > __time_out / 3)) {
+            send_block((block.set(__keep_alive, NULL, 0)));
+        }
+    }
+    return NULL;
+}
+
 void *Client::socket_listener() {
     signal(SIGTERM, thread_handler);
     while (true) {
@@ -420,6 +439,7 @@ void Client::send_block(Block &block) {
             exit(EXIT_FAILURE);
         }
     }
+    time(&_time);
 }
 
 Block &Client::recv_block(Block &block) {
