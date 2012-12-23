@@ -25,7 +25,7 @@ Block::Block(short cmd, const void *data, long size) {
 }
 
 Block::~Block() {
-    free(_data);
+    delete [] _data;
 }
 
 Block &Block::set(short cmd, const void *data, long size) {
