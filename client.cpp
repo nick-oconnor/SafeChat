@@ -326,14 +326,13 @@ void Client::console() {
                     } else {
                         time(&start_time);
                         std::cout << "Sending " << file_name << "..." << std::flush;
-                        block._cmd = __data;
                         do {
                             if (file_size - bytes_sent >= __fragment_size) {
                                 block._size = __fragment_size;
                             } else {
                                 block._size = file_size - bytes_sent;
                             }
-                            block.set(block._cmd, NULL, block._size);
+                            block.set(__data, NULL, block._size);
                             file.read(block._data, block._size);
                             send_block(block);
                             bytes_sent = file.tellg();
@@ -483,10 +482,15 @@ void Client::print_help() {
 }
 
 std::string Client::trim_path(std::string str) {
-    str = str.substr(0, str.find_last_not_of(" \'\"") + 1);
-    str = str.substr(str.find_first_not_of(" \'\""));
-    while (str.find("\\") != str.npos) {
-        str.erase(str.find("\\"));
+    
+    size_t pos;
+    
+    str = str.substr(0, str.find_last_not_of(" '\"") + 1);
+    str = str.substr(str.find_first_not_of(" '\""));
+    pos = str.find("\\");
+    while (pos != str.npos) {
+        str.erase(pos, 1);
+        pos = str.find("\\");
     }
     return str;
 }
