@@ -101,7 +101,7 @@ Client::~Client() {
     pthread_mutex_destroy(&_mutex);
     config_file.open(_config_path.c_str());
     if (!config_file) {
-        std::cerr << "Error: can't write '" << _config_path << "'.\n";
+        std::cerr << "Error: can't write " << _config_path << ".\n";
     } else {
         config_file << "Config file for SafeChat\n\nlocal_name=" << _name << "\nserver=" << _server << "\nport=" << _port << "\nfile_path=" << _file_path;
         config_file.close();
@@ -264,7 +264,7 @@ void Client::console() {
                     file.open(file_path.c_str(), std::ofstream::binary);
                     if (str == "n" || str == "N" || !file) {
                         if (!file) {
-                            std::cerr << "Error: can't write '" << file_path << "'.\n";
+                            std::cerr << "Error: can't write " << file_path << ".\n";
                         }
                         accept = false;
                         send_block(block.set(__data, &accept, sizeof accept));
@@ -279,7 +279,7 @@ void Client::console() {
                             file.write(block._data, block._size);
                             bytes_sent = file.tellp();
                             rate = bytes_sent / (difftime(time(NULL), start_time) + 1);
-                            std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "... " << std::fixed << std::setprecision(0) << (float) bytes_sent / file_size * 100 << "% (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
+                            std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "... " << std::fixed << std::setprecision(0) << (double) bytes_sent / file_size * 100 << "% (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
                         } while (bytes_sent < file_size);
                         file.close();
                         break;
@@ -310,7 +310,7 @@ void Client::console() {
                 pthread_mutex_unlock(&_mutex);
                 file.open(file_path.c_str(), std::ifstream::binary);
                 if (!file) {
-                    std::cerr << "Error: can't read '" << file_path << "'.\n";
+                    std::cerr << "Error: can't read " << file_path << ".\n";
                 } else {
                     file_name = file_path.substr(file_path.rfind("/"));
                     send_block(block.set(__data, file_name.c_str(), file_name.size() + 1));
@@ -498,13 +498,13 @@ std::string Client::format_size(long size) {
     std::stringstream stream;
 
     if (size / gb >= 1) {
-        stream << size / gb;
+        stream << std::fixed << std::setprecision(1) << size / gb;
         str += stream.str() + " GB";
     } else if (size / mb >= 1) {
-        stream << size / mb;
+        stream << std::fixed << std::setprecision(1) << size / mb;
         str += stream.str() + " MB";
     } else if (size / kb >= 1) {
-        stream << size / kb;
+        stream << std::fixed << std::setprecision(1) << size / kb;
         str += stream.str() + " KB";
     } else {
         stream << size;
