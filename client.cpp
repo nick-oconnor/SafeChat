@@ -328,8 +328,8 @@ void Client::console() {
                         std::cout << "\nSending " << file_name << "..." << std::flush;
                         do {
                             block._size = file_size - bytes_sent;
-                            if (block._size >= __fragment_size) {
-                                block._size = __fragment_size;
+                            if (block._size > __max_block_size) {
+                                block._size = __max_block_size;
                             }
                             block.set(__data, NULL, block._size);
                             file.read(block._data, block._size);
@@ -381,6 +381,10 @@ void *Client::socket_listener() {
         }
         if (!recv(_socket, &_block._size, sizeof _block._size, MSG_WAITALL)) {
             std::cerr << "\nError: dropped connection.\n";
+            exit(EXIT_FAILURE);
+        }
+        if (_block._size > __max_block_size) {
+            std::cerr << "\nError: oversized block received.\n";
             exit(EXIT_FAILURE);
         }
         _block.set(_block._cmd, NULL, _block._size);

@@ -27,21 +27,21 @@
 #include <openssl/bn.h>
 #include "block.h"
 
-#define __version               3
-#define __time_out              60
+#define __version           3
+#define __time_out          60
 
-#define __keep_alive            1
-#define __set_name              2
-#define __set_available         3
-#define __get_hosts             4
-#define __try_host              5
-#define __decline_client        6
-#define __accept_client         7
-#define __data                  8
-#define __disconnect            9
+#define __keep_alive        1
+#define __set_name          2
+#define __set_available     3
+#define __get_hosts         4
+#define __try_host          5
+#define __decline_client    6
+#define __accept_client     7
+#define __data              8
+#define __disconnect        9
 
-#define __key_bits              256
-#define __fragment_size         1048576
+#define __key_bits          256
+#define __max_block_size    1048576
 
 class Client {
 public:
