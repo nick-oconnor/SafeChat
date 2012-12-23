@@ -29,7 +29,7 @@ public:
 
     Block(short cmd, const void *data, long size);
     ~Block();
-    
+
     Block &set(short cmd, const void *data, long size);
 };
 

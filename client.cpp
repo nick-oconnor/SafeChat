@@ -110,7 +110,7 @@ Client::~Client() {
 
 void Client::start() {
 
-    int client_type, client_id, hosts_size, host_id, host_choice, response;
+    int client_id, hosts_size, host_id, host_choice, response;
     std::string str;
     std::vector< std::pair<int, std::string> > hosts;
     hostent *host;
@@ -145,10 +145,11 @@ void Client::start() {
     }
     send_block(block.set(__set_name, _name.c_str(), _name.size() + 1));
     do {
-        std::cout << "\nMain Menu\n\n    1) Start new host\n    2) Connect to host\n\nChoice: " << std::flush;
-        cin_str(str);
-        client_type = atoi(str.c_str());
-        if (client_type == 1) {
+        do {
+            std::cout << "\nMain Menu\n\n    1) Start new host\n    2) Connect to host\n\nChoice: " << std::flush;
+            cin_str(str);
+        } while (str != "1" && str != "2");
+        if (str == "1") {
             _display_menu = false;
             send_block(block.set(__set_available, NULL, 0));
             do {
@@ -156,30 +157,28 @@ void Client::start() {
                 client_id = *(int *) recv_block(block)._data;
                 _peer_name = recv_block(block)._data;
                 std::cout << "\n" << std::flush;
-                while (true) {
+                do {
                     std::cout << "Accept connection from " << _peer_name << "? (y/n) " << std::flush;
                     cin_str(str);
-                    if (str == "n" || str == "N") {
-                        send_block(block.set(__decline_client, &client_id, sizeof client_id));
-                        break;
-                    } else if (str == "y" || str == "Y") {
-                        send_block(block.set(__accept_client, &client_id, sizeof client_id));
-                        dh = DH_generate_parameters(__key_bits, 5, NULL, NULL);
-                        send_block(block.set(__data, BN_bn2hex(dh->p), strlen(BN_bn2hex(dh->p)) + 1));
-                        DH_generate_key(dh);
-                        send_block(block.set(__data, BN_bn2hex(dh->pub_key), strlen(BN_bn2hex(dh->p)) + 1));
-                        BN_hex2bn(&public_key, recv_block(block)._data);
+                } while (str != "y" && str != "Y" && str != "n" && str != "N");
+                if (str != "y" && str != "Y") {
+                    send_block(block.set(__decline_client, &client_id, sizeof client_id));
+                } else {
+                    send_block(block.set(__accept_client, &client_id, sizeof client_id));
+                    dh = DH_generate_parameters(__key_bits, 5, NULL, NULL);
+                    send_block(block.set(__data, BN_bn2hex(dh->p), strlen(BN_bn2hex(dh->p)) + 1));
+                    DH_generate_key(dh);
+                    send_block(block.set(__data, BN_bn2hex(dh->pub_key), strlen(BN_bn2hex(dh->p)) + 1));
+                    BN_hex2bn(&public_key, recv_block(block)._data);
 
-                        unsigned char key[DH_size(dh)];
+                    unsigned char key[DH_size(dh)];
 
-                        DH_compute_key(key, public_key, dh);
-                        initstate(1, (char *) key, DH_size(dh));
-                        console();
-                        break;
-                    }
+                    DH_compute_key(key, public_key, dh);
+                    initstate(1, (char *) key, DH_size(dh));
+                    console();
                 }
             } while (str != "y" && str != "Y");
-        } else if (client_type == 2) {
+        } else {
             _display_menu = false;
             do {
                 send_block(block.set(__get_hosts, NULL, 0));
@@ -207,9 +206,9 @@ void Client::start() {
                     send_block(block.set(__try_host, &hosts[host_choice - 1].first, sizeof hosts[host_choice - 1].first));
                     std::cout << "\nWaiting for " << _peer_name << " to accept your connection..." << std::flush;
                     response = recv_block(block)._cmd;
-                    if (response == __decline_client) {
+                    if (response != __accept_client) {
                         std::cout << "\n" << _peer_name << " declined your connection.\n" << std::flush;
-                    } else if (response == __accept_client) {
+                    } else {
                         std::cout << "\n" << std::flush;
                         dh = DH_generate_parameters(__key_bits, 5, NULL, NULL);
                         BN_hex2bn(&dh->p, recv_block(block)._data);
@@ -236,8 +235,7 @@ void Client::console() {
     Block block(0, NULL, 0);
 
     _encryption = true;
-    std::cout << "\n"
-            "Commands:\n\n    <path> - Transfer file\n    D - Disconnect\n\n" << std::flush;
+    std::cout << "\nCommands:\n\n    <path> - Transfer file\n    D - Disconnect\n\n" << std::flush;
     while (!terminate) {
         pthread_mutex_lock(&_mutex);
         std::cout << _name << ": " << std::flush;
@@ -247,7 +245,7 @@ void Client::console() {
         if (_socket_data) {
             if (_block._cmd == __data && _block._data[0] == '/') {
 
-                long file_size, bytes_sent = 0, rate;
+                long file_size, bytes_sent = 0, rate, time_elapsed;
                 std::string file_path, file_name;
                 std::ofstream file;
                 time_t start_time;
@@ -257,19 +255,21 @@ void Client::console() {
                 pthread_cond_signal(&_cond);
                 pthread_mutex_unlock(&_mutex);
                 file_size = *(long *) recv_block(block)._data;
-                while (true) {
+                do {
                     std::cout << "\r" << std::string(80, ' ') << "\rAccept transfer of " << file_name << " (" << format_size(file_size) << ")? (y/n) " << std::flush;
                     cin_str(str);
+                } while (str != "y" && str != "Y" && str != "n" && str != "N");
+                if (str != "y" && str != "y") {
+                    accept = false;
+                    send_block(block.set(__data, &accept, sizeof accept));
+                } else {
                     file_path = _file_path + file_name;
                     file.open(file_path.c_str(), std::ofstream::binary);
-                    if (str == "n" || str == "N" || !file) {
-                        if (!file) {
-                            std::cerr << "Error: can't write " << file_path << ".\n";
-                        }
+                    if (!file) {
+                        std::cerr << "Error: can't write " << file_path << ".\n";
                         accept = false;
                         send_block(block.set(__data, &accept, sizeof accept));
-                        break;
-                    } else if (str == "y" || str == "Y") {
+                    } else {
                         accept = true;
                         send_block(block.set(__data, &accept, sizeof accept));
                         time(&start_time);
@@ -278,11 +278,16 @@ void Client::console() {
                             recv_block(block);
                             file.write(block._data, block._size);
                             bytes_sent = file.tellp();
-                            rate = bytes_sent / (difftime(time(NULL), start_time) + 1);
-                            std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "... " << std::fixed << std::setprecision(0) << (double) bytes_sent / file_size * 100 << "% (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
+                            time_elapsed = difftime(time(NULL), start_time);
+                            if (time_elapsed) {
+                                rate = bytes_sent / time_elapsed;
+                                std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "... " << std::fixed << std::setprecision(0) << (double) bytes_sent / file_size * 100 << "% (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
+                            } else {
+                                std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "... " << std::fixed << std::setprecision(0) << (double) bytes_sent / file_size * 100 << "%" << std::flush;
+                            }
                         } while (bytes_sent < file_size);
+                        std::cout << "\n" << std::flush;
                         file.close();
-                        break;
                     }
                 }
             } else {
@@ -300,7 +305,7 @@ void Client::console() {
             str = trim_path(_str);
             if (str[0] == '/') {
 
-                long file_size, bytes_sent = 0, rate;
+                long file_size, bytes_sent = 0, rate, time_elapsed;
                 std::string file_path = str, file_name;
                 std::ifstream file;
                 time_t start_time;
@@ -334,9 +339,15 @@ void Client::console() {
                             file.read(block._data, block._size);
                             send_block(block);
                             bytes_sent = file.tellg();
-                            rate = bytes_sent / (difftime(time(NULL), start_time) + 1);
-                            std::cout << "\r" << std::string(80, ' ') << "\rSending " << file_name << "... " << std::fixed << std::setprecision(0) << (float) bytes_sent / file_size * 100 << "% (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
+                            time_elapsed = difftime(time(NULL), start_time);
+                            if (time_elapsed) {
+                                rate = bytes_sent / time_elapsed;
+                                std::cout << "\r" << std::string(80, ' ') << "\rSending " << file_name << "... " << std::fixed << std::setprecision(0) << (double) bytes_sent / file_size * 100 << "% (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
+                            } else {
+                                std::cout << "\r" << std::string(80, ' ') << "\rSending " << file_name << "... " << std::fixed << std::setprecision(0) << (double) bytes_sent / file_size * 100 << "%" << std::flush;
+                            }
                         } while (bytes_sent < file_size);
+                        std::cout << "\n" << std::flush;
                     }
                     file.close();
                 }
@@ -493,22 +504,25 @@ std::string Client::trim_path(std::string str) {
 
 std::string Client::format_size(long size) {
 
-    double gb = 1024 * 1024 * 1024, mb = 1024 * 1024, kb = 1024;
+    double gb = 1000 * 1000 * 1000, mb = 1000 * 1000, kb = 1000;
     std::string str;
     std::stringstream stream;
 
-    if (size / gb >= 1) {
-        stream << std::fixed << std::setprecision(1) << size / gb;
-        str += stream.str() + " GB";
-    } else if (size / mb >= 1) {
-        stream << std::fixed << std::setprecision(1) << size / mb;
-        str += stream.str() + " MB";
-    } else if (size / kb >= 1) {
-        stream << std::fixed << std::setprecision(1) << size / kb;
-        str += stream.str() + " KB";
+    gb = size / gb;
+    mb = size / mb;
+    kb = size / kb;
+    if (gb >= 1) {
+        stream << std::fixed << std::setprecision(1) << gb;
+        str = stream.str() + " GB";
+    } else if (mb >= 1) {
+        stream << std::fixed << std::setprecision(1) << mb;
+        str = stream.str() + " MB";
+    } else if (kb >= 1) {
+        stream << std::fixed << std::setprecision(0) << kb;
+        str = stream.str() + " KB";
     } else {
         stream << size;
-        str += stream.str() + " B";
+        str = stream.str() + " B";
     }
     return str;
 }
@@ -520,13 +534,13 @@ std::string Client::format_time(long seconds) {
 
     if (seconds / (60 * 60) >= 1) {
         stream << seconds / (60 * 60);
-        str += stream.str() + " hrs";
+        str = stream.str() + " hrs";
     } else if (seconds / 60 >= 1) {
         stream << seconds / 60;
-        str += stream.str() + " min";
+        str = stream.str() + " min";
     } else {
         stream << seconds;
-        str += stream.str() + " sec";
+        str = stream.str() + " sec";
     }
     return str;
 }

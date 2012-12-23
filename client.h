@@ -41,7 +41,7 @@
 #define __disconnect        9
 
 #define __key_bits          256
-#define __max_block_size    1048576
+#define __max_block_size    1000000
 
 class Client {
 public:

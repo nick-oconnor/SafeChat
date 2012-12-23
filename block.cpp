@@ -25,13 +25,13 @@ Block::Block(short cmd, const void *data, long size) {
 }
 
 Block::~Block() {
-    delete [] _data;
+    delete[] _data;
 }
 
 Block &Block::set(short cmd, const void *data, long size) {
     _cmd = cmd;
     _size = size;
-    delete [] _data;
+    delete[] _data;
     _data = new char[_size];
     if (data != NULL) {
         memcpy(_data, data, _size);
