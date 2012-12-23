@@ -81,7 +81,7 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
         exit(EXIT_FAILURE);
     }
     _file_path = trim_path(_file_path);
-    if (_file_path[_file_path.size()] != '/') {
+    if (_file_path[_file_path.size() - 1] != '/') {
         _file_path += "/";
     }
 }
@@ -325,7 +325,7 @@ void Client::console() {
                         std::cout << "\n" << _peer_name << " declined the file transfer.\n" << std::flush;
                     } else {
                         time(&start_time);
-                        std::cout << "Sending " << file_name << "..." << std::flush;
+                        std::cout << "\nSending " << file_name << "..." << std::flush;
                         do {
                             if (file_size - bytes_sent >= __fragment_size) {
                                 block._size = __fragment_size;
@@ -367,7 +367,7 @@ void *Client::keep_alive() {
     while (true) {
         sleep(__time_out / 3);
         if (difftime(_time, time(NULL) > __time_out / 3)) {
-            send_block((block.set(__keep_alive, NULL, 0)));
+            send_block(block.set(__keep_alive, NULL, 0));
         }
     }
     return NULL;
@@ -446,12 +446,7 @@ Block &Client::recv_block(Block &block) {
     while (!_socket_data) {
         pthread_cond_wait(&_cond, &_mutex);
     }
-    block._cmd = _block._cmd;
-    block._size = _block._size;
-    block.set(block._cmd, NULL, block._size);
-    if (block._size) {
-        memcpy(block._data, _block._data, block._size);
-    }
+    block.set(_block._cmd, _block._data, _block._size);
     _socket_data = false;
     pthread_cond_signal(&_cond);
     pthread_mutex_unlock(&_mutex);
