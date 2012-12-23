@@ -327,10 +327,9 @@ void Client::console() {
                         time(&start_time);
                         std::cout << "\nSending " << file_name << "..." << std::flush;
                         do {
-                            if (file_size - bytes_sent >= __fragment_size) {
+                            block._size = file_size - bytes_sent;
+                            if (block._size >= __fragment_size) {
                                 block._size = __fragment_size;
-                            } else {
-                                block._size = file_size - bytes_sent;
                             }
                             block.set(__data, NULL, block._size);
                             file.read(block._data, block._size);
@@ -366,7 +365,7 @@ void *Client::keep_alive() {
     signal(SIGTERM, thread_handler);
     while (true) {
         sleep(__time_out / 3);
-        if (difftime(_time, time(NULL) > __time_out / 3)) {
+        if (difftime(time(NULL), _time) > __time_out / 3) {
             send_block(block.set(__keep_alive, NULL, 0));
         }
     }
@@ -477,9 +476,9 @@ void Client::print_help() {
 }
 
 std::string Client::trim_path(std::string str) {
-    
+
     size_t pos;
-    
+
     str = str.substr(0, str.find_last_not_of(" '\"") + 1);
     str = str.substr(str.find_first_not_of(" '\""));
     pos = str.find("\\");
