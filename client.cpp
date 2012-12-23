@@ -281,7 +281,6 @@ void Client::console() {
                             rate = bytes_sent / (difftime(time(NULL), start_time) + 1);
                             std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "... " << std::fixed << std::setprecision(0) << (float) bytes_sent / file_size * 100 << "% (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
                         } while (bytes_sent < file_size);
-                        std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "... Done\n" << _name << ": " << std::flush;
                         file.close();
                         break;
                     }
@@ -338,7 +337,6 @@ void Client::console() {
                             rate = bytes_sent / (difftime(time(NULL), start_time) + 1);
                             std::cout << "\r" << std::string(80, ' ') << "\rSending " << file_name << "... " << std::fixed << std::setprecision(0) << (float) bytes_sent / file_size * 100 << "% (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
                         } while (bytes_sent < file_size);
-                        std::cout << "\r" << std::string(80, ' ') << "\rSending " << file_name << "... Done\n" << std::flush;
                     }
                     file.close();
                 }
