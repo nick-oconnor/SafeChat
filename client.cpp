@@ -132,9 +132,6 @@ void Client::start() {
         std::cerr << "Error: can't connect to " << _server << ".\n";
         exit(EXIT_FAILURE);
     }
-    pthread_create(&_keep_alive, NULL, &Client::keep_alive, this);
-    pthread_create(&_socket_listener, NULL, &Client::socket_listener, this);
-    pthread_create(&_cin_listener, NULL, &Client::cin_listener, this);
     if (*(short *) recv_block(block)._data != __version) {
         std::cerr << "Error: wrong server version.\n";
         exit(EXIT_FAILURE);
@@ -143,6 +140,9 @@ void Client::start() {
         std::cerr << "Error: " << _server << " is currently full.\n";
         exit(EXIT_FAILURE);
     }
+    pthread_create(&_keep_alive, NULL, &Client::keep_alive, this);
+    pthread_create(&_socket_listener, NULL, &Client::socket_listener, this);
+    pthread_create(&_cin_listener, NULL, &Client::cin_listener, this);
     send_block(block.set(__set_name, _name.c_str(), _name.size() + 1));
     do {
         do {
