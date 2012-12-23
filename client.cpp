@@ -493,22 +493,22 @@ std::string Client::trim_path(std::string str) {
 
 std::string Client::format_size(long size) {
 
-    long gb = 1024 * 1024 * 1024, mb = 1024 * 1024, kb = 1024;
+    double gb = 1024 * 1024 * 1024, mb = 1024 * 1024, kb = 1024;
     std::string str;
     std::stringstream stream;
 
     if (size / gb >= 1) {
         stream << size / gb;
-        str += stream.str() + "GB";
+        str += stream.str() + " GB";
     } else if (size / mb >= 1) {
         stream << size / mb;
-        str += stream.str() + "MB";
+        str += stream.str() + " MB";
     } else if (size / kb >= 1) {
         stream << size / kb;
-        str += stream.str() + "KB";
+        str += stream.str() + " KB";
     } else {
         stream << size;
-        str += stream.str() + "B";
+        str += stream.str() + " B";
     }
     return str;
 }
@@ -520,13 +520,13 @@ std::string Client::format_time(long seconds) {
 
     if (seconds / (60 * 60) >= 1) {
         stream << seconds / (60 * 60);
-        str += stream.str() + "hrs";
+        str += stream.str() + " hrs";
     } else if (seconds / 60 >= 1) {
         stream << seconds / 60;
-        str += stream.str() + "min";
+        str += stream.str() + " min";
     } else {
         stream << seconds;
-        str += stream.str() + "sec";
+        str += stream.str() + " sec";
     }
     return str;
 }
