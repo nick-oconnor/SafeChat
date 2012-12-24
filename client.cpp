@@ -436,19 +436,10 @@ void Client::send_block(Block &block) {
     if (_encryption) {
         encrypt(block);
     }
-    if (!send(_socket, &block._cmd, sizeof block._cmd, 0)) {
-        std::cerr << "\nError: dropped connection.\n";
-        exit(EXIT_FAILURE);
-    }
-    if (!send(_socket, &block._size, sizeof block._size, 0)) {
-        std::cerr << "\nError: dropped connection.\n";
-        exit(EXIT_FAILURE);
-    }
+    send(_socket, &block._cmd, sizeof block._cmd, 0);
+    send(_socket, &block._size, sizeof block._size, 0);
     if (block._size) {
-        if (!send(_socket, block._data, block._size, 0)) {
-            std::cerr << "\nError: dropped connection.\n";
-            exit(EXIT_FAILURE);
-        }
+        send(_socket, block._data, block._size, 0);
     }
     time(&_time);
 }
