@@ -69,7 +69,7 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
             _file_path += "/";
     } catch (std::string error) {
         std::cout << "SafeChat (version " << __version << ") - (c) 2012 Nicholas Pitt\nhttps://www.xphysics.net/\n\n    -n <name> Specifies the name forwarded to the SafeChat server (use quotes)\n    -s <serv> Specifies the DNS name or IP address of a SafeChat server\n    -p <port> Specifies the port the SafeChat server is running on\n    -f <path> Specifies the file transfer path (use quotes)\n    -v Displays the version\n\n" << std::flush;
-        std::cerr << "SafeChat: " << error << "\n";
+        std::cerr << "SafeChat: " << error << ".\n";
         exit(EXIT_FAILURE);
     }
 }
