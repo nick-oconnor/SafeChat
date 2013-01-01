@@ -183,7 +183,7 @@ void Client::start() {
                             std::cout << "\nChoice: " << std::flush;
                             cin_str(str);
                             host_choice = atoi(str.c_str()) - 1;
-                        } while (host_choice <= 1 || host_choice >= hosts_size);
+                        } while (host_choice < 1 || host_choice > hosts_size);
                         _peer_name = hosts[host_choice].second;
                         send_block(block.set(__try_host, &hosts[host_choice].first, sizeof hosts[host_choice].first));
                         std::cout << "\nWaiting for " << _peer_name << " to accept your connection..." << std::flush;
