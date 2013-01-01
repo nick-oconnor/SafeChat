@@ -37,7 +37,7 @@
 #define __try_host          5
 #define __decline_client    6
 #define __accept_client     7
-#define __data              8
+#define __send_data         8
 #define __disconnect        9
 
 #define __key_bits          256
@@ -88,7 +88,6 @@ private:
     Block &recv_block(Block &block);
     std::string &cin_str(std::string &str);
     Block &encrypt(Block &block);
-    void print_help();
     std::string trim_path(std::string str);
     std::string format_size(long rate);
     std::string format_time(long seconds);
