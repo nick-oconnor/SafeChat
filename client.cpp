@@ -254,7 +254,7 @@ void Client::start_shell() {
                     pthread_mutex_unlock(&_mutex);
                     file_size = *(long *) recv_block(block)._data;
                     do {
-                        std::cout << "\r" << std::string(80, ' ') << "\rAccept transfer of " << file_name << " (" << format_size(file_size) << ")? (y/n) " << std::flush;
+                        std::cout << "\nAccept transfer of " << file_name << " (" << format_size(file_size) << ")? (y/n) " << std::flush;
                         cin_string(string);
                     } while (string != "y" && string != "Y" && string != "n" && string != "N");
                     if (string != "y" && string != "y") {
