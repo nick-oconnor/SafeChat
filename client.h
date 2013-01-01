@@ -26,9 +26,11 @@
 #include <netdb.h>
 #include <openssl/dh.h>
 #include <openssl/bn.h>
+#include <openssl/evp.h>
+#include <openssl/aes.h>
 #include "block.h"
 
-#define __version           3
+#define __version           4
 #define __time_out          60
 
 #define __keep_alive        1
@@ -41,8 +43,8 @@
 #define __send_data         8
 #define __disconnect        9
 
-#define __key_bits          256
 #define __max_block_size    1000000
+#define __key_length        256
 
 class Client {
 public:
@@ -76,21 +78,23 @@ private:
 
     bool _socket_data, _cin_data, _encryption;
     int _port, _socket;
+    unsigned char _key[__key_length];
     time_t _time;
     pthread_t _keep_alive, _socket_listener, _cin_listener;
     pthread_cond_t _cond;
     pthread_mutex_t _mutex;
-    std::string _config_path, _name, _server, _file_path, _peer_name, _str;
+    std::string _config_path, _name, _server, _file_path, _peer_name, _string;
+    EVP_CIPHER_CTX _encryption_ctx, _decryption_ctx;
     Block _block;
 
     void console();
     void *keep_alive();
     void *socket_listener();
     void *cin_listener();
+    void init_cipher();
     void send_block(Block &block);
     Block &recv_block(Block &block);
     std::string &cin_str(std::string &str);
-    Block &encrypt(Block &block);
     std::string trim_path(std::string str);
     std::string format_size(long rate);
     std::string format_time(long seconds);

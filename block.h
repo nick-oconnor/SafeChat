@@ -24,13 +24,13 @@ class Block {
 public:
 
     short _cmd;
-    long _size;
+    int _size;
     char *_data;
 
-    Block(short cmd, const void *data, long size);
+    Block(short cmd, const void *data, int size);
     ~Block();
 
-    Block &set(short cmd, const void *data, long size);
+    Block &set(short cmd, const void *data, int size);
 };
 
 #endif

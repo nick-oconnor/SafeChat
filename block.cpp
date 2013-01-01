@@ -15,7 +15,7 @@
 
 #include "block.h"
 
-Block::Block(short cmd, const void *data, long size) {
+Block::Block(short cmd, const void *data, int size) {
     _cmd = cmd;
     _size = size;
     _data = new char[_size];
@@ -27,7 +27,7 @@ Block::~Block() {
     delete[] _data;
 }
 
-Block &Block::set(short cmd, const void *data, long size) {
+Block &Block::set(short cmd, const void *data, int size) {
     _cmd = cmd;
     _size = size;
     delete[] _data;
