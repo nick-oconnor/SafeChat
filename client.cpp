@@ -155,8 +155,8 @@ void Client::start() {
                         send_block(block.set(__send_data, BN_bn2hex(dh->pub_key), strlen(BN_bn2hex(dh->p)) + 1));
                         BN_hex2bn(&public_key, recv_block(block)._data);
                         key = new unsigned char[DH_size(dh)];
-                        DH_compute_key(key, public_key, dh);
                         initstate(1, (char *) key, DH_size(dh));
+                        DH_compute_key(key, public_key, dh);
                         console();
                         delete[] key;
                     }
@@ -198,8 +198,8 @@ void Client::start() {
                             send_block(block.set(__send_data, BN_bn2hex(dh->pub_key), strlen(BN_bn2hex(dh->p)) + 1));
                             BN_hex2bn(&public_key, recv_block(block)._data);
                             key = new unsigned char[DH_size(dh)];
-                            DH_compute_key(key, public_key, dh);
                             initstate(1, (char *) key, DH_size(dh));
+                            DH_compute_key(key, public_key, dh);
                             console();
                             delete[] key;
                         }
