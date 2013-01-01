@@ -25,7 +25,7 @@ public:
 
     short _cmd;
     int _size;
-    char *_data;
+    unsigned char *_data;
 
     Block(short cmd, const void *data, int size);
     ~Block();

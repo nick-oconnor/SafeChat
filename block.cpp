@@ -18,7 +18,7 @@
 Block::Block(short cmd, const void *data, int size) {
     _cmd = cmd;
     _size = size;
-    _data = new char[_size];
+    _data = new unsigned char[_size];
     if (data != NULL)
         memcpy(_data, data, _size);
 }
@@ -31,7 +31,7 @@ Block &Block::set(short cmd, const void *data, int size) {
     _cmd = cmd;
     _size = size;
     delete[] _data;
-    _data = new char[_size];
+    _data = new unsigned char[_size];
     if (data != NULL)
         memcpy(_data, data, _size);
     return *this;

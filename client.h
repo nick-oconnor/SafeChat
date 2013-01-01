@@ -30,18 +30,20 @@
 #include <openssl/aes.h>
 #include "block.h"
 
-#define __version           4
-#define __time_out          60
+#define __version           1.5
+#define __timeout           60
 
-#define __keep_alive        1
-#define __set_name          2
-#define __set_available     3
-#define __get_hosts         4
-#define __try_host          5
-#define __decline_client    6
-#define __accept_client     7
-#define __send_data         8
-#define __disconnect        9
+#define __keepalive         1
+#define __protocol          2
+#define __full              3
+#define __name              4
+#define __available         5
+#define __hosts             6
+#define __try               7
+#define __decline           8
+#define __accept            9
+#define __data              10
+#define __disconnect        11
 
 #define __max_block_size    1000000
 #define __key_length        256
@@ -56,10 +58,10 @@ public:
     Client(int argc, char *argv[]);
     ~Client();
 
-    void start();
+    void start_client();
 
-    static void *keep_alive(void *client) {
-        return ((Client *) client)->keep_alive();
+    static void *keepalive(void *client) {
+        return ((Client *) client)->keepalive();
     }
 
     static void *socket_listener(void *client) {
@@ -79,24 +81,23 @@ private:
     bool _socket_data, _cin_data, _encryption;
     int _port, _socket;
     unsigned char _key[__key_length];
+    std::string _config_path, _name, _server, _file_path, _peer_name, _string;
     time_t _time;
-    pthread_t _keep_alive, _socket_listener, _cin_listener;
+    pthread_t _keepalive, _socket_listener, _cin_listener;
     pthread_cond_t _cond;
     pthread_mutex_t _mutex;
-    std::string _config_path, _name, _server, _file_path, _peer_name, _string;
     EVP_CIPHER_CTX _encryption_ctx, _decryption_ctx;
     Block _block;
 
-    void console();
-    void *keep_alive();
+    void start_shell();
+    void *keepalive();
     void *socket_listener();
     void *cin_listener();
-    void init_cipher();
-    void send_block(Block &block);
+    void send_block(const Block &block);
     Block &recv_block(Block &block);
-    std::string &cin_str(std::string &str);
-    std::string trim_path(std::string str);
-    std::string format_size(long rate);
+    std::string &cin_string(std::string &string);
+    std::string trim_path(std::string path);
+    std::string format_size(long bytes);
     std::string format_time(long seconds);
 };
 
