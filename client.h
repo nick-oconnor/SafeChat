@@ -20,6 +20,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <stdexcept>
 #include <signal.h>
 #include <pthread.h>
 #include <netdb.h>

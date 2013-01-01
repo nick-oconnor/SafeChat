@@ -54,22 +54,22 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
                 std::cout << "SafeChat version " << __version << "\n" << std::flush;
                 exit(EXIT_SUCCESS);
             } else
-                throw "unknown argument '" + std::string(argv[i]) + "'";
+                throw std::runtime_error("unknown argument '" + std::string(argv[i]) + "'");
         }
         if (_name.size() < 1)
-            throw "name required";
+            throw std::runtime_error("name required");
         if (_server.size() < 1)
-            throw "server required";
+            throw std::runtime_error("server required");
         if (_port < 1 || _port > 65535)
-            throw "invalid port number";
+            throw std::runtime_error("invalid port number");
         if (_file_path.size() < 1)
-            throw "file transfer path required";
+            throw std::runtime_error("file transfer path required");
         _file_path = trim_path(_file_path);
         if (_file_path[_file_path.size() - 1] != '/')
             _file_path += "/";
-    } catch (std::string error) {
+    } catch (const std::exception &exception) {
         std::cout << "SafeChat (version " << __version << ") - (c) 2012 Nicholas Pitt\nhttps://www.xphysics.net/\n\n    -n <name> Specifies the name forwarded to the SafeChat server (use quotes)\n    -s <serv> Specifies the DNS name or IP address of a SafeChat server\n    -p <port> Specifies the port the SafeChat server is running on\n    -f <path> Specifies the file transfer path (use quotes)\n    -v Displays the version\n\n" << std::flush;
-        std::cerr << "SafeChat: " << error << ".\n";
+        std::cerr << "SafeChat: " << exception.what() << ".\n";
         exit(EXIT_FAILURE);
     }
 }
@@ -90,13 +90,11 @@ Client::~Client() {
         pthread_mutex_destroy(&_mutex);
         config_file.open(_config_path.c_str());
         if (!config_file)
-            throw "can't write " + _config_path;
-        else {
-            config_file << "Config file for SafeChat\n\nlocal_name=" << _name << "\nserver=" << _server << "\nport=" << _port << "\nfile_path=" << _file_path;
-            config_file.close();
-        }
-    } catch (std::string error) {
-        std::cerr << "Error: " << error << ".\n";
+            throw std::runtime_error("can't write " + _config_path);
+        config_file << "Config file for SafeChat\n\nlocal_name=" << _name << "\nserver=" << _server << "\nport=" << _port << "\nfile_path=" << _file_path;
+        config_file.close();
+    } catch (const std::exception &exception) {
+        std::cerr << "Error: " << exception.what() << ".\n";
     }
 }
 
@@ -116,19 +114,19 @@ void Client::start() {
         _socket = socket(AF_INET, SOCK_STREAM, 0);
         host = gethostbyname(_server.c_str());
         if (!host)
-            throw "can't resolve " + _server;
+            throw std::runtime_error("can't resolve " + _server);
         addr.sin_family = AF_INET;
         memcpy(&addr.sin_addr.s_addr, host->h_addr_list[0], host->h_length);
         addr.sin_port = htons(_port);
         if (connect(_socket, (sockaddr *) & addr, sizeof addr))
-            throw "can't connect to " + _server;
+            throw std::runtime_error("can't connect to " + _server);
         pthread_create(&_keep_alive, NULL, &Client::keep_alive, this);
         pthread_create(&_socket_listener, NULL, &Client::socket_listener, this);
         pthread_create(&_cin_listener, NULL, &Client::cin_listener, this);
         if (*(short *) recv_block(block)._data != __version)
-            throw "wrong server version";
+            throw std::runtime_error("wrong server version");
         if (*(bool *) recv_block(block)._data)
-            throw _server + " is currently full";
+            throw std::runtime_error(_server + " is currently full");
         send_block(block.set(__set_name, _name.c_str(), _name.size() + 1));
         do {
             do {
@@ -209,8 +207,8 @@ void Client::start() {
                 } while (response != __accept_client);
             }
         } while (_display_menu);
-    } catch (std::string error) {
-        std::cerr << "Error: " << error << ".\n";
+    } catch (const std::exception &exception) {
+        std::cerr << "Error: " << exception.what() << ".\n";
         exit(EXIT_FAILURE);
     }
 }
@@ -255,7 +253,7 @@ void Client::console() {
                         if (!file) {
                             accept = false;
                             send_block(block.set(__send_data, &accept, sizeof accept));
-                            throw "can't write " + file_path;
+                            throw std::runtime_error("can't write " + file_path);
                         }
                         accept = true;
                         send_block(block.set(__send_data, &accept, sizeof accept));
@@ -300,7 +298,7 @@ void Client::console() {
                     pthread_mutex_unlock(&_mutex);
                     file.open(file_path.c_str(), std::ifstream::binary);
                     if (!file)
-                        throw "can't read " + file_path;
+                        throw std::runtime_error("can't read " + file_path);
                     file_name = file_path.substr(file_path.rfind("/"));
                     send_block(block.set(__send_data, file_name.c_str(), file_name.size() + 1));
                     file_name = file_name.substr(1);
@@ -344,8 +342,8 @@ void Client::console() {
                     pthread_mutex_unlock(&_mutex);
                 }
             }
-        } catch (std::string error) {
-            std::cerr << "Error: " << error << ".\n";
+        } catch (const std::exception &exception) {
+            std::cerr << "Error: " << exception.what() << ".\n";
         }
     }
 }
@@ -370,15 +368,15 @@ void *Client::socket_listener() {
         signal(SIGTERM, thread_handler);
         while (true) {
             if (!recv(_socket, &_block._cmd, sizeof _block._cmd, MSG_WAITALL))
-                throw "dropped connection";
+                throw std::runtime_error("dropped connection");
             if (!recv(_socket, &_block._size, sizeof _block._size, MSG_WAITALL))
-                throw "dropped connection";
+                throw std::runtime_error("dropped connection");
             if (_block._size > __max_block_size)
                 throw "oversized block received";
             _block.set(_block._cmd, NULL, _block._size);
             if (_block._size)
                 if (!recv(_socket, _block._data, _block._size, MSG_WAITALL))
-                    throw "dropped connection";
+                    throw std::runtime_error("dropped connection");
             if (_encryption)
                 encrypt(_block);
             _socket_data = true;
@@ -388,8 +386,8 @@ void *Client::socket_listener() {
                 pthread_cond_wait(&_cond, &_mutex);
             pthread_mutex_unlock(&_mutex);
         }
-    } catch (std::string error) {
-        std::cerr << "\nError: " << error << ".\n";
+    } catch (const std::exception &exception) {
+        std::cerr << "\nError: " << exception.what() << ".\n";
         exit(EXIT_FAILURE);
     }
     return NULL;
