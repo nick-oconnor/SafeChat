@@ -103,7 +103,7 @@ void Client::start() {
     int client_id, hosts_size, host_id, host_choice, response;
     unsigned char *key;
     std::string str;
-    std::vector< std::pair<int, std::string> > hosts;
+    host_t hosts;
     hostent *host;
     sockaddr_in addr;
     DH *dh;
@@ -182,10 +182,10 @@ void Client::start() {
                                 std::cout << "    " << i + 1 << ") " << hosts[i].second << "\n" << std::flush;
                             std::cout << "\nChoice: " << std::flush;
                             cin_str(str);
-                            host_choice = atoi(str.c_str());
-                        } while (host_choice < 1 || host_choice > hosts_size);
-                        _peer_name = hosts[host_choice - 1].second;
-                        send_block(block.set(__try_host, &hosts[host_choice - 1].first, sizeof hosts[host_choice - 1].first));
+                            host_choice = atoi(str.c_str()) - 1;
+                        } while (host_choice <= 1 || host_choice >= hosts_size);
+                        _peer_name = hosts[host_choice].second;
+                        send_block(block.set(__try_host, &hosts[host_choice].first, sizeof hosts[host_choice].first));
                         std::cout << "\nWaiting for " << _peer_name << " to accept your connection..." << std::flush;
                         response = recv_block(block)._cmd;
                         if (response != __accept_client)

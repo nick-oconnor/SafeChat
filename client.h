@@ -16,10 +16,10 @@
 #ifndef client_h
 #define	client_h
 
+#include <vector>
 #include <iomanip>
 #include <fstream>
 #include <sstream>
-#include <vector>
 #include <stdexcept>
 #include <signal.h>
 #include <pthread.h>
@@ -46,6 +46,8 @@
 
 class Client {
 public:
+
+    typedef std::vector<std::pair<int, std::string> > host_t;
 
     bool _display_menu;
 
