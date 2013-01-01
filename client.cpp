@@ -289,8 +289,10 @@ void Client::start_shell() {
                 } else {
                     if (_block._cmd == __data)
                         std::cout << "\r" << _peer_name << ": " << _block._data << "\n" << std::flush;
-                    else
+                    else {
+                        std::cout << "\n" << std::flush;
                         terminate = true;
+                    }
                     _socket_data = false;
                     pthread_cond_signal(&_cond);
                     pthread_mutex_unlock(&_mutex);
@@ -352,7 +354,7 @@ void Client::start_shell() {
             std::cerr << "Error: " << exception.what() << ".\n";
         }
     }
-    std::cout << "\r" << std::string(80, ' ') << "\nDisconnected.\n\n" << std::flush;
+    std::cout << "\nDisconnected.\n\n" << std::flush;
 }
 
 void *Client::keepalive() {
