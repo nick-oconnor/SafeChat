@@ -30,22 +30,19 @@
 #include <openssl/aes.h>
 #include "block.h"
 
-#define __version           1.5
+#define __version           2.0
 #define __timeout           60
 
-#define __keepalive         1
-#define __protocol          2
-#define __full              3
-#define __name              4
-#define __available         5
-#define __hosts             6
-#define __try               7
-#define __decline           8
-#define __accept            9
-#define __data              10
-#define __disconnect        11
+#define __keepalive         0
+#define __name              1
+#define __available         2
+#define __hosts             3
+#define __try               4
+#define __accept            5
+#define __data              6
+#define __disconnect        7
 
-#define __max_block_size    1000000
+#define __max_block_size    1024 * 1024
 #define __key_length        256
 
 class Client {
@@ -58,7 +55,7 @@ public:
     Client(int argc, char *argv[]);
     ~Client();
 
-    void start_client();
+    int start();
 
     static void *keepalive(void *client) {
         return ((Client *) client)->keepalive();
@@ -74,7 +71,7 @@ public:
 
     static void thread_handler(int signal) {
         pthread_exit(NULL);
-    };
+    }
 
 private:
 
@@ -89,7 +86,7 @@ private:
     EVP_CIPHER_CTX _encryption_ctx, _decryption_ctx;
     Block _block;
 
-    void start_shell();
+    void shell();
     void *keepalive();
     void *socket_listener();
     void *cin_listener();
@@ -99,6 +96,7 @@ private:
     std::string trim_path(std::string path);
     std::string format_size(long bytes);
     std::string format_time(long seconds);
+
 };
 
 #endif

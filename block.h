@@ -31,6 +31,7 @@ public:
     ~Block();
 
     Block &set(short cmd, const void *data, int size);
+
 };
 
 #endif

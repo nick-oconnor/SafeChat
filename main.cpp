@@ -19,13 +19,16 @@ Client *client;
 
 void main_handler(int signal) {
     delete client;
-    exit(EXIT_SUCCESS);
+    exit(signal);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char **argv) {
     signal(SIGINT, main_handler);
     client = new Client(argc, argv);
-    client->start_client();
+    if (client->start()) {
+        delete client;
+        return EXIT_FAILURE;
+    }
     delete client;
     return EXIT_SUCCESS;
 }

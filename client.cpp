@@ -15,7 +15,7 @@
 
 #include "client.h"
 
-Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
+Client::Client(int argc, char **argv) : _block(0, NULL, 0) {
 
     std::string string;
     std::ifstream config_file;
@@ -55,7 +55,7 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
             else if (string == "-f" && i + 1 < argc)
                 _file_path = argv[++i];
             else
-                throw std::runtime_error("unknown argument '" + std::string(argv[i]) + "'");
+                throw std::runtime_error("unknown argument " + std::string(argv[i]));
         }
         if (_name.size() < 1)
             throw std::runtime_error("name required");
@@ -78,14 +78,15 @@ Client::Client(int argc, char *argv[]) : _block(0, NULL, 0) {
 Client::~Client() {
 
     std::ofstream config_file;
-    Block block(0, NULL, 0);
 
     try {
-        pthread_kill(_keepalive, SIGTERM);
-        pthread_kill(_socket_listener, SIGTERM);
+        std::cout << "\n" << std::flush;
         pthread_kill(_cin_listener, SIGTERM);
-        send_block(block.set(__disconnect, NULL, 0));
-        close(_socket);
+        if (_socket) {
+            pthread_kill(_keepalive, SIGTERM);
+            pthread_kill(_socket_listener, SIGTERM);
+            close(_socket);
+        }
         pthread_mutex_unlock(&_mutex);
         pthread_cond_destroy(&_cond);
         pthread_mutex_destroy(&_mutex);
@@ -103,12 +104,13 @@ Client::~Client() {
     }
 }
 
-void Client::start_client() {
+int Client::start() {
 
-    int id, hosts_size, choice, response;
+    bool accept;
+    int id, hosts_size, choice;
     std::string string;
-    hostent *host;
     sockaddr_in addr;
+    hostent *host;
     DH *dh;
     BIGNUM *pub_key;
     host_t hosts;
@@ -116,11 +118,6 @@ void Client::start_client() {
 
     try {
         do {
-            pthread_create(&_cin_listener, NULL, &Client::cin_listener, this);
-            do {
-                std::cout << "\nMain Menu\n\n    1) Start new host\n    2) Connect to host\n\nChoice: " << std::flush;
-                cin_string(string);
-            } while (string != "1" && string != "2");
             _socket = socket(AF_INET, SOCK_STREAM, 0);
             host = gethostbyname(_server.c_str());
             if (!host)
@@ -132,6 +129,15 @@ void Client::start_client() {
                 throw std::runtime_error("can't connect to server");
             pthread_create(&_keepalive, NULL, &Client::keepalive, this);
             pthread_create(&_socket_listener, NULL, &Client::socket_listener, this);
+            pthread_create(&_cin_listener, NULL, &Client::cin_listener, this);
+            if (*(int *) recv_block(block)._data != (int) __version)
+                throw std::runtime_error("incompatible server version");
+            if (*(bool *) recv_block(block)._data)
+                throw std::runtime_error("server is currently full");
+            do {
+                std::cout << "\nMain Menu\n\n    1) Start new host\n    2) Connect to host\n\nChoice: " << std::flush;
+                cin_string(string);
+            } while (string != "1" && string != "2");
             send_block(block.set(__name, _name.c_str(), _name.size() + 1));
             if (string == "1") {
                 _display_menu = false;
@@ -145,10 +151,12 @@ void Client::start_client() {
                         std::cout << "Accept connection from " << _peer_name << "? (y/n) " << std::flush;
                         cin_string(string);
                     } while (string != "y" && string != "Y" && string != "n" && string != "N");
-                    if (string != "y" && string != "Y")
-                        send_block(block.set(__decline, &id, sizeof id));
-                    else {
-                        send_block(block.set(__accept, &id, sizeof id));
+                    if (string != "y" && string != "Y") {
+                        accept = false;
+                        send_block(block.set(__accept, &accept, sizeof accept));
+                    } else {
+                        accept = true;
+                        send_block(block.set(__accept, &accept, sizeof accept));
                         dh = DH_generate_parameters(__key_length, 5, NULL, NULL);
                         block.set(__data, NULL, BN_num_bytes(dh->p));
                         BN_bn2bin(dh->p, block._data);
@@ -162,7 +170,7 @@ void Client::start_client() {
                         DH_compute_key(_key, pub_key, dh);
                         BN_free(pub_key);
                         DH_free(dh);
-                        start_shell();
+                        shell();
                     }
                 } while (string != "y" && string != "Y");
             } else {
@@ -191,8 +199,8 @@ void Client::start_client() {
                         _peer_name = hosts[choice].second;
                         send_block(block.set(__try, &hosts[choice].first, sizeof hosts[choice].first));
                         std::cout << "\nWaiting for " << _peer_name << " to accept your connection..." << std::flush;
-                        response = recv_block(block)._cmd;
-                        if (response != __accept)
+                        accept = *(bool *) recv_block(block)._data;
+                        if (!accept)
                             std::cout << "\n" << _peer_name << " declined your connection.\n" << std::flush;
                         else {
                             std::cout << "\n" << std::flush;
@@ -208,23 +216,24 @@ void Client::start_client() {
                             DH_compute_key(_key, pub_key, dh);
                             BN_free(pub_key);
                             DH_free(dh);
-                            start_shell();
+                            shell();
                         }
                     }
-                } while (response != __accept);
+                } while (!accept);
             }
         } while (_display_menu);
     } catch (const std::exception &exception) {
-        std::cerr << "Error: " << exception.what() << ".\n";
-        exit(EXIT_FAILURE);
+        std::cerr << "Error: " << exception.what() << ".";
+        return EXIT_FAILURE;
     }
+    return EXIT_SUCCESS;
 }
 
-void Client::start_shell() {
+void Client::shell() {
 
-    bool terminate = false, accept;
-    int max_block_size = __max_block_size - AES_BLOCK_SIZE;
-    long file_size, bytes_sent, rate, time_elapsed;
+    bool accept;
+    int max_data_size = __max_block_size - AES_BLOCK_SIZE;
+    long file_size, bytes_sent, bytes_remaining, rate, time_elapsed;
     unsigned char key[32], iv[32];
     std::string string, file_path, file_name;
     std::ofstream out_file;
@@ -239,22 +248,23 @@ void Client::start_shell() {
     EVP_DecryptInit_ex(&_decryption_ctx, EVP_aes_256_cbc(), NULL, key, iv);
     _encryption = true;
     std::cout << "\nCommands:\n\n    <path> - Transfer file\n    <entr> - Disconnect\n\n" << std::flush;
-    while (!terminate) {
+    while (true) {
         try {
             pthread_mutex_lock(&_mutex);
             std::cout << _name << ": " << std::flush;
             while (!_socket_data && !_cin_data)
                 pthread_cond_wait(&_cond, &_mutex);
             if (_socket_data) {
-                if (_block._cmd == __data && _block._data[0] == '/') {
+                if (_block._data[0] == '/') {
                     file_name = (char *) _block._data;
                     file_name = file_name.substr(1);
                     _socket_data = false;
                     pthread_cond_signal(&_cond);
                     pthread_mutex_unlock(&_mutex);
                     file_size = *(long *) recv_block(block)._data;
+                    std::cout << "\n" << std::flush;
                     do {
-                        std::cout << "\nAccept transfer of " << file_name << " (" << format_size(file_size) << ")? (y/n) " << std::flush;
+                        std::cout << "Accept transfer of " << file_name << " (" << format_size(file_size) << ")? (y/n) " << std::flush;
                         cin_string(string);
                     } while (string != "y" && string != "Y" && string != "n" && string != "N");
                     if (string != "y" && string != "y") {
@@ -270,29 +280,27 @@ void Client::start_shell() {
                         }
                         accept = true;
                         send_block(block.set(__data, &accept, sizeof accept));
+                        bytes_sent = 0;
+                        bytes_remaining = file_size;
                         time(&start_time);
                         std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "..." << std::flush;
                         do {
                             recv_block(block);
                             out_file.write((char *) block._data, block._size);
-                            bytes_sent = out_file.tellp();
+                            bytes_sent += block._size;
+                            bytes_remaining -= block._size;
                             time_elapsed = difftime(time(NULL), start_time);
                             std::cout << "\r" << std::string(80, ' ') << "\rReceiving " << file_name << "... " << std::fixed << std::setprecision(0) << (double) bytes_sent / file_size * 100 << "%" << std::flush;
                             if (time_elapsed) {
                                 rate = bytes_sent / time_elapsed;
-                                std::cout << " (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
+                                std::cout << " (" << format_time(bytes_remaining / rate) << " at " << format_size(rate) << "/s)" << std::flush;
                             }
                         } while (bytes_sent < file_size);
                         std::cout << "\n" << std::flush;
                         out_file.close();
                     }
                 } else {
-                    if (_block._cmd == __data)
-                        std::cout << "\r" << _peer_name << ": " << _block._data << "\n" << std::flush;
-                    else {
-                        std::cout << "\n" << std::flush;
-                        terminate = true;
-                    }
+                    std::cout << "\r" << _peer_name << ": " << _block._data << "\n" << std::flush;
                     _socket_data = false;
                     pthread_cond_signal(&_cond);
                     pthread_mutex_unlock(&_mutex);
@@ -317,34 +325,36 @@ void Client::start_shell() {
                     if (!*(bool *) recv_block(block)._data)
                         std::cout << "\n" << _peer_name << " declined the file transfer.\n" << std::flush;
                     else {
-                        time(&start_time);
                         bytes_sent = 0;
+                        bytes_remaining = file_size;
+                        time(&start_time);
                         std::cout << "\nSending " << file_name << "..." << std::flush;
                         do {
-                            block._size = file_size - bytes_sent;
-                            if (block._size > max_block_size)
-                                block._size = max_block_size;
+                            if (bytes_remaining > max_data_size)
+                                block._size = max_data_size;
+                            else
+                                block._size = bytes_remaining;
                             block.set(__data, NULL, block._size);
                             in_file.read((char *) block._data, block._size);
                             send_block(block);
-                            bytes_sent = in_file.tellg();
+                            bytes_sent += block._size;
+                            bytes_remaining -= block._size;
                             time_elapsed = difftime(time(NULL), start_time);
                             std::cout << "\r" << std::string(80, ' ') << "\rSending " << file_name << "... " << std::fixed << std::setprecision(0) << (double) bytes_sent / file_size * 100 << "%" << std::flush;
                             if (time_elapsed) {
                                 rate = bytes_sent / time_elapsed;
-                                std::cout << " (" << format_time((file_size - bytes_sent) / rate) << " at " << format_size(rate) << "/s)" << std::flush;
+                                std::cout << " (" << format_time(bytes_remaining / rate) << " at " << format_size(rate) << "/s)" << std::flush;
                             }
-                        } while (bytes_sent < file_size);
+                        } while (bytes_remaining);
                         std::cout << "\n" << std::flush;
                     }
                     in_file.close();
                 } else {
-                    if (_string.size())
-                        send_block(block.set(__data, _string.c_str(), _string.size() + 1));
-                    else {
-                        send_block(block.set(__disconnect, NULL, 0));
-                        terminate = true;
-                    }
+                    if (_string.size() + 1 > max_data_size)
+                        block._size = max_data_size;
+                    else
+                        block._size = _string.size() + 1;
+                    send_block(block.set(__data, _string.c_str(), block._size));
                     _cin_data = false;
                     pthread_cond_signal(&_cond);
                     pthread_mutex_unlock(&_mutex);
@@ -354,7 +364,6 @@ void Client::start_shell() {
             std::cerr << "Error: " << exception.what() << ".\n";
         }
     }
-    std::cout << "\nDisconnected.\n\n" << std::flush;
 }
 
 void *Client::keepalive() {
@@ -376,8 +385,8 @@ void *Client::socket_listener() {
     int padding;
     Block recv_block(0, NULL, 0);
 
+    signal(SIGTERM, thread_handler);
     try {
-        signal(SIGTERM, thread_handler);
         while (true) {
             if (!recv(_socket, &recv_block._cmd, sizeof recv_block._cmd, MSG_WAITALL))
                 throw std::runtime_error("dropped connection");
@@ -389,17 +398,11 @@ void *Client::socket_listener() {
             if (recv_block._size)
                 if (!recv(_socket, recv_block._data, recv_block._size, MSG_WAITALL))
                     throw std::runtime_error("dropped connection");
-            if (recv_block._cmd == __protocol)
-                if (*(int *) recv_block._data != (int) __version)
-                    throw std::runtime_error("incompatible server version");
-                else
-                    continue;
-            if (recv_block._cmd == __full)
-                if (*(bool *) recv_block._data)
-                    throw std::runtime_error("server is currently full");
-                else
-                    continue;
-            if (!_encryption)
+            if (recv_block._cmd == __disconnect) {
+                std::cout << "\n\nDisconnected.\n\n" << std::flush;
+                exit(EXIT_SUCCESS);
+            }
+            if (!_encryption || !recv_block._data)
                 _block.set(recv_block._cmd, recv_block._data, recv_block._size);
             else {
                 _block.set(recv_block._cmd, NULL, recv_block._size + AES_BLOCK_SIZE);
@@ -423,9 +426,17 @@ void *Client::socket_listener() {
 }
 
 void *Client::cin_listener() {
+
+    Block block(0, NULL, 0);
+
     signal(SIGTERM, thread_handler);
     while (true) {
         std::getline(std::cin, _string);
+        if (!_string.size()) {
+            send_block(block.set(__disconnect, NULL, 0));
+            std::cout << "\nDisconnected.\n\n" << std::flush;
+            exit(EXIT_SUCCESS);
+        }
         _cin_data = true;
         pthread_mutex_lock(&_mutex);
         pthread_cond_signal(&_cond);
@@ -441,7 +452,7 @@ void Client::send_block(const Block &block) {
     int padding;
     Block send_block(0, NULL, 0);
 
-    if (!_encryption)
+    if (!_encryption || !block._data)
         send_block.set(block._cmd, block._data, block._size);
     else {
         send_block.set(block._cmd, NULL, block._size + AES_BLOCK_SIZE);
@@ -497,7 +508,7 @@ std::string Client::trim_path(std::string path) {
 
 std::string Client::format_size(long bytes) {
 
-    double gb = 1000 * 1000 * 1000, mb = 1000 * 1000, kb = 1000;
+    double gb = 1024 * 1024 * 1024, mb = 1024 * 1024, kb = 1024;
     std::string string;
     std::stringstream stream;
 
