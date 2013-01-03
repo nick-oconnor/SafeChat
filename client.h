@@ -23,6 +23,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <netdb.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <string.h>
 #include <pthread.h>
