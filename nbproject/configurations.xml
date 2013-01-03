@@ -5,8 +5,6 @@
                    displayName="Source Files"
                    projectFiles="true">
       <itemPath>README</itemPath>
-      <itemPath>block.cpp</itemPath>
-      <itemPath>block.h</itemPath>
       <itemPath>client.cpp</itemPath>
       <itemPath>client.h</itemPath>
       <itemPath>main.cpp</itemPath>

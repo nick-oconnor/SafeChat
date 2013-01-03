@@ -17,56 +17,43 @@
 #define	client_h
 
 #include <vector>
-#include <iomanip>
 #include <fstream>
 #include <sstream>
+#include <iomanip>
+#include <iostream>
 #include <stdexcept>
-#include <signal.h>
-#include <pthread.h>
 #include <netdb.h>
+#include <signal.h>
+#include <string.h>
+#include <pthread.h>
 #include <openssl/dh.h>
 #include <openssl/bn.h>
 #include <openssl/evp.h>
 #include <openssl/aes.h>
-#include "block.h"
 
-#define __version           2.0
-#define __timeout           60
-
-#define __keepalive         0
-#define __name              1
-#define __available         2
-#define __hosts             3
-#define __try               4
-#define __accept            5
-#define __data              6
-#define __disconnect        7
-
-#define __max_block_size    1024 * 1024
-#define __key_length        256
+#define __version       3.0
+#define __timeout       30
+#define __key_length    256
+#define __block_size    1024 * 1024
 
 class Client {
 public:
-
-    typedef std::vector<std::pair<int, std::string> > host_t;
-
-    bool _display_menu;
 
     Client(int argc, char *argv[]);
     ~Client();
 
     int start();
 
-    static void *keepalive(void *client) {
-        return ((Client *) client)->keepalive();
+    static void *keepalive_sender(void *client) {
+        return ((Client *) client)->keepalive_sender();
     }
 
-    static void *socket_listener(void *client) {
-        return ((Client *) client)->socket_listener();
+    static void *network_listener(void *client) {
+        return ((Client *) client)->network_listener();
     }
 
-    static void *cin_listener(void *client) {
-        return ((Client *) client)->cin_listener();
+    static void *terminal_listener(void *client) {
+        return ((Client *) client)->terminal_listener();
     }
 
     static void thread_handler(int signal) {
@@ -75,24 +62,69 @@ public:
 
 private:
 
-    bool _socket_data, _cin_data, _encryption;
+    typedef std::vector<std::pair<int, std::string> > hosts_t;
+
+    struct block_t {
+
+        enum cmd_t {
+            keepalive, version, full, name, host, list, request, accept, decline, unavailable, data, disconnect
+        } _cmd;
+        int _size;
+        unsigned char *_data;
+
+        block_t() {
+            _data = new unsigned char[__block_size];
+        }
+
+        block_t(cmd_t cmd) {
+            _cmd = cmd;
+            _size = 0;
+            _data = new unsigned char[__block_size];
+        }
+
+        block_t(cmd_t cmd, int size) {
+            _cmd = cmd;
+            _size = size;
+            _data = new unsigned char[__block_size];
+        }
+
+        block_t(cmd_t cmd, const void *data, int size) {
+            _cmd = cmd;
+            _size = size;
+            _data = new unsigned char[__block_size];
+            memcpy(_data, data, size);
+        }
+
+        ~block_t() {
+            delete[] _data;
+        }
+
+        block_t &operator=(const block_t & block) {
+            _cmd = block._cmd;
+            _size = block._size;
+            memcpy(_data, block._data, block._size);
+            return *this;
+        }
+
+    } _block;
+
+    bool _network_data, _terminal_data, _encryption;
     int _port, _socket;
     unsigned char _key[__key_length];
     std::string _config_path, _name, _server, _file_path, _peer_name, _string;
     time_t _time;
-    pthread_t _keepalive, _socket_listener, _cin_listener;
+    pthread_t _keepalive_sender, _network_listener, _terminal_listener;
     pthread_cond_t _cond;
     pthread_mutex_t _mutex;
     EVP_CIPHER_CTX _encryption_ctx, _decryption_ctx;
-    Block _block;
 
     void shell();
-    void *keepalive();
-    void *socket_listener();
-    void *cin_listener();
-    void send_block(const Block &block);
-    Block &recv_block(Block &block);
-    std::string &cin_string(std::string &string);
+    void *keepalive_sender();
+    void *network_listener();
+    void *terminal_listener();
+    void send_block(const block_t &block);
+    void recv_block(block_t &block);
+    void get_string(std::string &string);
     std::string trim_path(std::string path);
     std::string format_size(long bytes);
     std::string format_time(long seconds);
