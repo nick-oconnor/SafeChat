@@ -63,12 +63,12 @@ public:
 
 private:
 
-    typedef std::vector<std::pair<int, std::string> > hosts_t;
+    typedef std::vector<std::pair<int, std::string> > peers_t;
 
     struct block_t {
 
         enum cmd_t {
-            keepalive, version, full, name, host, list, request, accept, decline, unavailable, data, disconnect
+            keepalive, version, full, name, add, list, connect, unavailable, data, disconnect
         } _cmd;
         int _size;
         unsigned char *_data;
