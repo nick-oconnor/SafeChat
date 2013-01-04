@@ -32,7 +32,7 @@
 #include <openssl/evp.h>
 #include <openssl/aes.h>
 
-#define __version       3.0
+#define __version       4.0
 #define __timeout       30
 #define __key_length    256
 #define __block_size    1024 * 1024
