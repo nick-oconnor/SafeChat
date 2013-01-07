@@ -46,7 +46,7 @@ public:
     void encrypt_block(block_t &dest, const block_t &source);
     void decrypt_block(block_t &dest, const block_t &source);
 
-    bool is_ready() {
+    bool is_ready() const {
         return _ready;
     }
 
