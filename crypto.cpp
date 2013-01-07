@@ -57,6 +57,9 @@ void Crypto::set_generator(const block_t &source) {
 void Crypto::set_public_key(const block_t &source) {
     BN_bin2bn(source._data, source._size, _pub_key);
     DH_compute_key(_key, _pub_key, _dh);
+    SHA256_Init(&_sha256_ctx);
+    SHA256_Update(&_sha256_ctx, _key, __key_size);
+    SHA256_Final(_key, &_sha256_ctx);
 }
 
 void Crypto::set_init_vector(const block_t &source) {

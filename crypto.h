@@ -18,8 +18,9 @@
 
 #include <openssl/dh.h>
 #include <openssl/bn.h>
-#include <openssl/evp.h>
 #include <openssl/aes.h>
+#include <openssl/sha.h>
+#include <openssl/evp.h>
 #include <openssl/rand.h>
 #include "block.h"
 
@@ -55,6 +56,7 @@ private:
     unsigned char _key[__key_size], _iv[__iv_size];
     DH *_dh;
     BIGNUM *_pub_key;
+    SHA256_CTX _sha256_ctx;
     EVP_CIPHER_CTX _encryption_ctx, _decryption_ctx;
 
 };

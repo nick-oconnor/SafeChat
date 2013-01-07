@@ -28,7 +28,7 @@
 #include <pthread.h>
 #include "crypto.h"
 
-#define __version       4.1
+#define __version       4.2
 #define __timeout       30
 
 class Client {
