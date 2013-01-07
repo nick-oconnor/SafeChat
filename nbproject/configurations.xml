@@ -5,8 +5,11 @@
                    displayName="Source Files"
                    projectFiles="true">
       <itemPath>README</itemPath>
+      <itemPath>block.h</itemPath>
       <itemPath>client.cpp</itemPath>
       <itemPath>client.h</itemPath>
+      <itemPath>crypto.cpp</itemPath>
+      <itemPath>crypto.h</itemPath>
       <itemPath>main.cpp</itemPath>
     </logicalFolder>
     <logicalFolder name="TestFiles"

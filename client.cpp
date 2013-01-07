@@ -20,7 +20,7 @@ Client::Client(int argc, char **argv) {
     std::string string;
     std::ifstream config_file;
 
-    _network_data = _terminal_data = _encryption = false;
+    _network_data = _terminal_data = false;
     time(&_time);
     pthread_cond_init(&_cond, NULL);
     pthread_mutex_init(&_mutex, NULL);
@@ -85,10 +85,6 @@ Client::~Client() {
     pthread_mutex_unlock(&_mutex);
     pthread_cond_destroy(&_cond);
     pthread_mutex_destroy(&_mutex);
-    if (_encryption) {
-        EVP_CIPHER_CTX_cleanup(&_encryption_ctx);
-        EVP_CIPHER_CTX_cleanup(&_decryption_ctx);
-    }
     try {
         config_file.open(_config_path.c_str());
         if (!config_file)
@@ -104,11 +100,10 @@ Client::~Client() {
 int Client::start() {
 
     int id, hosts_size, choice;
+    float version = __version;
     std::string string;
     sockaddr_in addr;
     hostent *host;
-    DH *dh = DH_new();
-    BIGNUM *pub_key = BN_new();
     peers_t peers;
     block_t block;
     block_t::cmd_t response;
@@ -133,6 +128,11 @@ int Client::start() {
         if (*(bool *) block._data)
             throw std::runtime_error("server is full");
         send_block(block_t(block_t::name, _name.c_str(), _name.size() + 1));
+    } catch (const std::exception &exception) {
+        std::cerr << "Error: " << exception.what() << ".";
+        return EXIT_FAILURE;
+    }
+    try {
         while (true) {
             do {
                 std::cout << "\nMain Menu\n\n    1) Start\n    2) Connect\n\nChoice: " << std::flush;
@@ -143,20 +143,20 @@ int Client::start() {
                 std::cout << "\nWaiting for peer to connect..." << std::flush;
                 recv_block(block);
                 _peer_name = (char *) block._data;
-                std::cout << "\n\n" << _peer_name << " connected." << std::flush;
-                DH_generate_parameters_ex(dh, __key_length, 5, NULL);
-                block = block_t(block_t::data, BN_num_bytes(dh->p));
-                BN_bn2bin(dh->p, block._data);
+                std::cout << "\n\nConnected to " << _peer_name << "." << std::flush;
+                send_block(block_t(block_t::data, &version, sizeof version));
+                recv_block(block);
+                if (*(float *) block._data != (float) __version)
+                    throw std::runtime_error("incompatible peer version");
+                _crypto.get_generator(block);
                 send_block(block);
-                DH_generate_key(dh);
-                block = block_t(block_t::data, BN_num_bytes(dh->pub_key));
-                BN_bn2bin(dh->pub_key, block._data);
+                _crypto.get_public_key(block);
                 send_block(block);
                 recv_block(block);
-                BN_bin2bn(block._data, block._size, pub_key);
-                DH_compute_key(_key, pub_key, dh);
-                BN_free(pub_key);
-                DH_free(dh);
+                _crypto.set_public_key(block);
+                _crypto.get_init_vector(block);
+                send_block(block);
+                _crypto.set_init_vector(block);
                 shell();
             } else if (string == "2") {
                 do {
@@ -188,18 +188,18 @@ int Client::start() {
                     if (response == block_t::connect) {
                         _peer_name = (char *) block._data;
                         std::cout << "\nConnected to " << _peer_name << "." << std::flush;
-                        DH_generate_parameters_ex(dh, __key_length, 5, NULL);
                         recv_block(block);
-                        BN_bin2bn(block._data, block._size, dh->p);
-                        DH_generate_key(dh);
-                        block = block_t(block_t::data, BN_num_bytes(dh->pub_key));
-                        BN_bn2bin(dh->pub_key, block._data);
+                        send_block(block_t(block_t::data, &version, sizeof version));
+                        if (*(float *) block._data != (float) __version)
+                            throw std::runtime_error("incompatible peer version");
+                        recv_block(block);
+                        _crypto.set_generator(block);
+                        _crypto.get_public_key(block);
                         send_block(block);
                         recv_block(block);
-                        BN_bin2bn(block._data, block._size, pub_key);
-                        DH_compute_key(_key, pub_key, dh);
-                        BN_free(pub_key);
-                        DH_free(dh);
+                        _crypto.set_public_key(block);
+                        recv_block(block);
+                        _crypto.set_init_vector(block);
                         shell();
                     } else if (response == block_t::unavailable) {
                         std::cout << "\n" << peers[choice].second << " is unavailable." << std::endl;
@@ -208,7 +208,7 @@ int Client::start() {
             }
         }
     } catch (const std::exception &exception) {
-        std::cerr << "Error: " << exception.what() << ".";
+        std::cerr << "\nError: " << exception.what() << ".";
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
@@ -217,21 +217,13 @@ int Client::start() {
 void Client::shell() {
 
     bool accept;
-    unsigned int data_size = __block_size - AES_BLOCK_SIZE;
     long file_size, bytes_sent, bytes_remaining, rate, time_elapsed;
-    unsigned char key[32], iv[32];
     std::string string, file_path, file_name;
     std::ofstream out_file;
     std::ifstream in_file;
     time_t start_time;
     block_t block;
 
-    EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha256(), (unsigned char *) "SafeChat", _key, __key_length, 5, key, iv);
-    EVP_CIPHER_CTX_init(&_encryption_ctx);
-    EVP_CIPHER_CTX_init(&_decryption_ctx);
-    EVP_EncryptInit_ex(&_encryption_ctx, EVP_aes_256_cbc(), NULL, key, iv);
-    EVP_DecryptInit_ex(&_decryption_ctx, EVP_aes_256_cbc(), NULL, key, iv);
-    _encryption = true;
     std::cout << "\n\nCommands:\n\n    <path> - Transfer file\n    <entr> - Disconnect\n" << std::endl;
     while (true) {
         try {
@@ -315,8 +307,8 @@ void Client::shell() {
                         time(&start_time);
                         std::cout << "\nSending " << file_name << "..." << std::flush;
                         do {
-                            if (bytes_remaining > data_size)
-                                block._size = data_size;
+                            if (bytes_remaining > __data_size)
+                                block._size = __data_size;
                             else
                                 block._size = bytes_remaining;
                             block = block_t(block_t::data, block._size);
@@ -336,8 +328,8 @@ void Client::shell() {
                         std::cout << "\n" << _peer_name << " declined the file transfer." << std::endl;
                     in_file.close();
                 } else {
-                    if (_string.size() + 1 > data_size)
-                        block._size = data_size;
+                    if (_string.size() + 1 > __data_size)
+                        block._size = __data_size;
                     else
                         block._size = _string.size() + 1;
                     send_block(block_t(block_t::data, _string.c_str(), block._size));
@@ -350,62 +342,6 @@ void Client::shell() {
             std::cerr << "Error: " << exception.what() << ".\n";
         }
     }
-}
-
-void *Client::keepalive_sender() {
-
-    int interval = __timeout / 3;
-
-    signal(SIGTERM, thread_handler);
-    while (true) {
-        sleep(interval);
-        if (difftime(time(NULL), _time) > interval)
-            send_block(block_t(block_t::keepalive));
-    }
-    return NULL;
-}
-
-void *Client::network_listener() {
-
-    int padding;
-    block_t recv_block;
-
-    signal(SIGTERM, thread_handler);
-    try {
-        while (true) {
-            if (!recv(_socket, &recv_block._cmd, sizeof recv_block._cmd, MSG_WAITALL))
-                throw std::runtime_error("connection dropped");
-            if (!recv(_socket, &recv_block._size, sizeof recv_block._size, MSG_WAITALL))
-                throw std::runtime_error("connection dropped");
-            if (recv_block._size > __block_size)
-                throw std::runtime_error("oversized block received");
-            if (recv_block._size)
-                if (!recv(_socket, recv_block._data, recv_block._size, MSG_WAITALL))
-                    throw std::runtime_error("connection dropped");
-            if (recv_block._cmd == block_t::disconnect) {
-                std::cout << "\n\nDisconnected.\n" << std::endl;
-                exit(EXIT_SUCCESS);
-            }
-            if (_encryption && recv_block._size) {
-                _block = block_t(recv_block._cmd);
-                EVP_DecryptInit_ex(&_decryption_ctx, NULL, NULL, NULL, NULL);
-                EVP_DecryptUpdate(&_decryption_ctx, _block._data, &_block._size, recv_block._data, recv_block._size);
-                EVP_DecryptFinal_ex(&_decryption_ctx, _block._data + _block._size, &padding);
-                _block._size += padding;
-            } else
-                _block = recv_block;
-            _network_data = true;
-            pthread_mutex_lock(&_mutex);
-            pthread_cond_signal(&_cond);
-            while (_network_data)
-                pthread_cond_wait(&_cond, &_mutex);
-            pthread_mutex_unlock(&_mutex);
-        }
-    } catch (const std::exception &exception) {
-        std::cerr << "\nError: " << exception.what() << ".\n";
-        exit(EXIT_FAILURE);
-    }
-    return NULL;
 }
 
 void *Client::terminal_listener() {
@@ -427,42 +363,88 @@ void *Client::terminal_listener() {
     return NULL;
 }
 
-void Client::send_block(const block_t & block) {
+void *Client::network_listener() {
 
-    int padding;
-    block_t send_block;
+    block_t block;
+
+    signal(SIGTERM, thread_handler);
+    try {
+        while (true) {
+            if (!recv(_socket, &block._cmd, sizeof block._cmd, MSG_WAITALL))
+                throw std::runtime_error("connection dropped");
+            if (!recv(_socket, &block._size, sizeof block._size, MSG_WAITALL))
+                throw std::runtime_error("connection dropped");
+            if (block._size > __block_size)
+                throw std::runtime_error("oversized block received");
+            if (block._size)
+                if (!recv(_socket, block._data, block._size, MSG_WAITALL))
+                    throw std::runtime_error("connection dropped");
+            if (block._cmd == block_t::disconnect) {
+                std::cout << "\n\nDisconnected.\n" << std::endl;
+                exit(EXIT_SUCCESS);
+            }
+            if (_crypto.is_ready() && block._size)
+                _crypto.decrypt_block(_block, block);
+            else
+                _block = block;
+            _network_data = true;
+            pthread_mutex_lock(&_mutex);
+            pthread_cond_signal(&_cond);
+            while (_network_data)
+                pthread_cond_wait(&_cond, &_mutex);
+            pthread_mutex_unlock(&_mutex);
+        }
+    } catch (const std::exception &exception) {
+        std::cerr << "\nError: " << exception.what() << ".\n";
+        exit(EXIT_FAILURE);
+    }
+    return NULL;
+}
+
+void *Client::keepalive_sender() {
+
+    int interval = __timeout / 3;
+
+    signal(SIGTERM, thread_handler);
+    while (true) {
+        sleep(interval);
+        if (difftime(time(NULL), _time) > interval)
+            send_block(block_t(block_t::keepalive));
+    }
+    return NULL;
+}
+
+void Client::send_block(const block_t &source) {
+
+    block_t block;
 
     signal(SIGPIPE, SIG_IGN);
-    if (_encryption && block._size) {
-        send_block = block_t(block._cmd);
-        EVP_EncryptInit_ex(&_encryption_ctx, NULL, NULL, NULL, NULL);
-        EVP_EncryptUpdate(&_encryption_ctx, send_block._data, &send_block._size, block._data, block._size);
-        EVP_EncryptFinal_ex(&_encryption_ctx, send_block._data + send_block._size, &padding);
-        send_block._size += padding;
-    } else
-        send_block = block;
-    send(_socket, &send_block._cmd, sizeof send_block._cmd, 0);
-    send(_socket, &send_block._size, sizeof send_block._size, 0);
-    if (send_block._size)
-        send(_socket, send_block._data, send_block._size, 0);
+    if (_crypto.is_ready() && source._size)
+        _crypto.encrypt_block(block, source);
+    else
+        block = source;
+    send(_socket, &block._cmd, sizeof block._cmd, 0);
+    send(_socket, &block._size, sizeof block._size, 0);
+    if (block._size)
+        send(_socket, block._data, block._size, 0);
     time(&_time);
 }
 
-void Client::recv_block(block_t & block) {
+void Client::recv_block(block_t &dest) {
     pthread_mutex_lock(&_mutex);
     while (!_network_data)
         pthread_cond_wait(&_cond, &_mutex);
-    block = _block;
+    dest = _block;
     _network_data = false;
     pthread_cond_signal(&_cond);
     pthread_mutex_unlock(&_mutex);
 }
 
-void Client::get_string(std::string & string) {
+void Client::get_string(std::string &dest) {
     pthread_mutex_lock(&_mutex);
     while (!_terminal_data)
         pthread_cond_wait(&_cond, &_mutex);
-    string = _string;
+    dest = _string;
     _terminal_data = false;
     pthread_cond_signal(&_cond);
     pthread_mutex_unlock(&_mutex);
