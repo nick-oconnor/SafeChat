@@ -16,18 +16,21 @@
 #ifndef crypto_h
 #define	crypto_h
 
+#include <stdexcept>
 #include <openssl/dh.h>
 #include <openssl/bn.h>
 #include <openssl/aes.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/rand.h>
 #include "block.h"
 
 #define __key_length    256
 #define __key_size      __key_length / 8
 #define __iv_size       AES_BLOCK_SIZE
-#define __data_size     __block_size - AES_BLOCK_SIZE
+#define __hmac_size     SHA_DIGEST_LENGTH
+#define __data_size     __block_size - AES_BLOCK_SIZE - __hmac_size
 
 class Crypto {
 public:
@@ -35,11 +38,11 @@ public:
     Crypto();
     ~Crypto();
 
-    void get_generator(block_t &dest);
+    void get_prime(block_t &dest);
     void get_public_key(block_t &dest);
     void get_init_vector(block_t &dest);
 
-    void set_generator(const block_t &source);
+    void set_prime(const block_t &source);
     void set_public_key(const block_t &source);
     void set_init_vector(const block_t &source);
 
@@ -58,6 +61,7 @@ private:
     BIGNUM *_pub_key;
     SHA256_CTX _sha256_ctx;
     EVP_CIPHER_CTX _encryption_ctx, _decryption_ctx;
+    HMAC_CTX _hmac_ctx;
 
 };
 

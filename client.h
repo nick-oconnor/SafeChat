@@ -17,18 +17,17 @@
 #define	client_h
 
 #include <vector>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
-#include <iomanip>
 #include <iostream>
-#include <stdexcept>
 #include <netdb.h>
-#include <stdlib.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include "crypto.h"
 
-#define __version       4.2
+#define __version       4.3
 #define __timeout       30
 
 class Client {
@@ -37,7 +36,7 @@ public:
     Client(int argc, char *argv[]);
     ~Client();
 
-    int start();
+    void start();
 
     static void *terminal_listener(void *client) {
         return ((Client *) client)->terminal_listener();

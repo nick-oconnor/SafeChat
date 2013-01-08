@@ -21,6 +21,7 @@ Crypto::Crypto() {
     _pub_key = BN_new();
     EVP_CIPHER_CTX_init(&_encryption_ctx);
     EVP_CIPHER_CTX_init(&_decryption_ctx);
+    HMAC_CTX_init(&_hmac_ctx);
 }
 
 Crypto::~Crypto() {
@@ -28,11 +29,11 @@ Crypto::~Crypto() {
     BN_free(_pub_key);
     EVP_CIPHER_CTX_cleanup(&_encryption_ctx);
     EVP_CIPHER_CTX_cleanup(&_decryption_ctx);
+    HMAC_CTX_cleanup(&_hmac_ctx);
     memset(_key, 0, __key_size);
-    memset(_iv, 0, __iv_size);
 }
 
-void Crypto::get_generator(block_t &dest) {
+void Crypto::get_prime(block_t &dest) {
     DH_generate_parameters_ex(_dh, __key_length, 5, NULL);
     dest = block_t(block_t::data, BN_num_bytes(_dh->p));
     BN_bn2bin(_dh->p, dest._data);
@@ -49,7 +50,7 @@ void Crypto::get_init_vector(block_t &dest) {
     RAND_bytes(dest._data, __iv_size);
 }
 
-void Crypto::set_generator(const block_t &source) {
+void Crypto::set_prime(const block_t &source) {
     DH_generate_parameters_ex(_dh, __key_length, 5, NULL);
     BN_bin2bn(source._data, source._size, _dh->p);
 }
@@ -75,18 +76,28 @@ void Crypto::encrypt_block(block_t &dest, const block_t &source) {
     EVP_EncryptInit_ex(&_encryption_ctx, EVP_aes_256_cbc(), NULL, _key, _iv);
     EVP_EncryptUpdate(&_encryption_ctx, dest._data, &dest._size, source._data, source._size);
     EVP_EncryptFinal_ex(&_encryption_ctx, dest._data + dest._size, &padding);
-    dest._size += padding;
     memcpy(_iv, _encryption_ctx.iv, __iv_size);
+    dest._size += padding;
+    HMAC_Init_ex(&_hmac_ctx, _key, __key_size, EVP_sha1(), NULL);
+    HMAC_Update(&_hmac_ctx, dest._data, dest._size);
+    HMAC_Final(&_hmac_ctx, dest._data + dest._size, NULL);
+    dest._size += __hmac_size;
 }
 
 void Crypto::decrypt_block(block_t &dest, const block_t &source) {
 
-    int padding;
+    int padding, data_size = source._size - __hmac_size;
+    unsigned char hmac[__hmac_size];
 
+    HMAC_Init_ex(&_hmac_ctx, _key, __key_size, EVP_sha1(), NULL);
+    HMAC_Update(&_hmac_ctx, source._data, data_size);
+    HMAC_Final(&_hmac_ctx, hmac, NULL);
+    if (memcmp(hmac, source._data + data_size, __hmac_size))
+        throw std::runtime_error("can't authenticate block");
     dest._cmd = source._cmd;
     EVP_DecryptInit_ex(&_decryption_ctx, EVP_aes_256_cbc(), NULL, _key, _iv);
-    EVP_DecryptUpdate(&_decryption_ctx, dest._data, &dest._size, source._data, source._size);
+    EVP_DecryptUpdate(&_decryption_ctx, dest._data, &dest._size, source._data, data_size);
     EVP_DecryptFinal_ex(&_decryption_ctx, dest._data + dest._size, &padding);
-    dest._size += padding;
     memcpy(_iv, _decryption_ctx.iv, __iv_size);
+    dest._size += padding;
 }

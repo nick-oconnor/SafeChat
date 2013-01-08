@@ -78,9 +78,11 @@ Client::~Client() {
 
     std::ofstream config_file;
 
-    pthread_kill(_terminal_listener, SIGTERM);
+    if (!pthread_equal(pthread_self(), _terminal_listener))
+        pthread_kill(_terminal_listener, SIGTERM);
+    if (!pthread_equal(pthread_self(), _network_listener))
+        pthread_kill(_network_listener, SIGTERM);
     pthread_kill(_keepalive_sender, SIGTERM);
-    pthread_kill(_network_listener, SIGTERM);
     close(_socket);
     pthread_mutex_unlock(&_mutex);
     pthread_cond_destroy(&_cond);
@@ -92,12 +94,12 @@ Client::~Client() {
         config_file << "Configuration file for SafeChat\n\nlocal_name=" << _name << "\nserver=" << _server << "\nport=" << _port << "\nfile_path=" << _file_path;
         config_file.close();
     } catch (const std::exception &exception) {
-        std::cerr << "Error: " << exception.what() << ".";
+        std::cerr << "\nError: " << exception.what() << ".";
     }
     std::cout << std::endl;
 }
 
-int Client::start() {
+void Client::start() {
 
     int id, hosts_size, choice;
     float version = __version;
@@ -106,7 +108,6 @@ int Client::start() {
     hostent *host;
     peers_t peers;
     block_t block;
-    block_t::cmd_t response;
 
     try {
         _socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -119,8 +120,8 @@ int Client::start() {
         if (connect(_socket, (sockaddr *) & addr, sizeof addr))
             throw std::runtime_error("can't connect to server");
         pthread_create(&_terminal_listener, NULL, &Client::terminal_listener, this);
-        pthread_create(&_keepalive_sender, NULL, &Client::keepalive_sender, this);
         pthread_create(&_network_listener, NULL, &Client::network_listener, this);
+        pthread_create(&_keepalive_sender, NULL, &Client::keepalive_sender, this);
         recv_block(block);
         if (*(int *) block._data != (int) __version)
             throw std::runtime_error("incompatible server version");
@@ -130,7 +131,8 @@ int Client::start() {
         send_block(block_t(block_t::name, _name.c_str(), _name.size() + 1));
     } catch (const std::exception &exception) {
         std::cerr << "Error: " << exception.what() << ".";
-        return EXIT_FAILURE;
+        this->~Client();
+        exit(EXIT_FAILURE);
     }
     try {
         while (true) {
@@ -148,7 +150,7 @@ int Client::start() {
                 recv_block(block);
                 if (*(float *) block._data != (float) __version)
                     throw std::runtime_error("incompatible peer version");
-                _crypto.get_generator(block);
+                _crypto.get_prime(block);
                 send_block(block);
                 _crypto.get_public_key(block);
                 send_block(block);
@@ -159,7 +161,7 @@ int Client::start() {
                 _crypto.set_init_vector(block);
                 shell();
             } else if (string == "2") {
-                do {
+                while (true) {
                     send_block(block_t(block_t::list));
                     recv_block(block);
                     hosts_size = *(int *) block._data;
@@ -184,8 +186,7 @@ int Client::start() {
                     } while (choice < 0 || choice >= hosts_size);
                     send_block(block_t(block_t::connect, &peers[choice].first, sizeof peers[choice].first));
                     recv_block(block);
-                    response = block._cmd;
-                    if (response == block_t::connect) {
+                    if (block._cmd == block_t::connect) {
                         _peer_name = (char *) block._data;
                         std::cout << "\nConnected to " << _peer_name << "." << std::flush;
                         recv_block(block);
@@ -193,7 +194,7 @@ int Client::start() {
                         if (*(float *) block._data != (float) __version)
                             throw std::runtime_error("incompatible peer version");
                         recv_block(block);
-                        _crypto.set_generator(block);
+                        _crypto.set_prime(block);
                         _crypto.get_public_key(block);
                         send_block(block);
                         recv_block(block);
@@ -201,17 +202,17 @@ int Client::start() {
                         recv_block(block);
                         _crypto.set_init_vector(block);
                         shell();
-                    } else if (response == block_t::unavailable) {
+                    } else if (block._cmd == block_t::unavailable) {
                         std::cout << "\n" << peers[choice].second << " is unavailable." << std::endl;
                     }
-                } while (response == block_t::unavailable);
+                }
             }
         }
     } catch (const std::exception &exception) {
         std::cerr << "\nError: " << exception.what() << ".";
-        return EXIT_FAILURE;
+        this->~Client();
+        exit(EXIT_FAILURE);
     }
-    return EXIT_SUCCESS;
 }
 
 void Client::shell() {
@@ -350,7 +351,8 @@ void *Client::terminal_listener() {
         std::getline(std::cin, _string);
         if (!_string.size()) {
             send_block(block_t(block_t::disconnect));
-            std::cout << "\nDisconnected.\n" << std::endl;
+            std::cout << "\nDisconnected." << std::endl;
+            this->~Client();
             exit(EXIT_SUCCESS);
         }
         _terminal_data = true;
@@ -380,7 +382,8 @@ void *Client::network_listener() {
                 if (!recv(_socket, block._data, block._size, MSG_WAITALL))
                     throw std::runtime_error("connection dropped");
             if (block._cmd == block_t::disconnect) {
-                std::cout << "\n\nDisconnected.\n" << std::endl;
+                std::cout << "\n\nDisconnected." << std::endl;
+                this->~Client();
                 exit(EXIT_SUCCESS);
             }
             if (_crypto.is_ready() && block._size)
@@ -395,7 +398,8 @@ void *Client::network_listener() {
             pthread_mutex_unlock(&_mutex);
         }
     } catch (const std::exception &exception) {
-        std::cerr << "\nError: " << exception.what() << ".\n";
+        std::cerr << "\nError: " << exception.what() << ".";
+        this->~Client();
         exit(EXIT_FAILURE);
     }
     return NULL;
