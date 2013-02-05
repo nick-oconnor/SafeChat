@@ -189,8 +189,8 @@ void Client::start() {
                     if (block._cmd == block_t::connect) {
                         _peer_name = (char *) block._data;
                         std::cout << "\nConnected to " << _peer_name << "." << std::flush;
-                        recv_block(block);
                         send_block(block_t(block_t::data, &version, sizeof version));
+                        recv_block(block);
                         if (*(float *) block._data != (float) __version)
                             throw std::runtime_error("incompatible peer version");
                         recv_block(block);
@@ -202,9 +202,8 @@ void Client::start() {
                         recv_block(block);
                         _crypto.set_init_vector(block);
                         shell();
-                    } else if (block._cmd == block_t::unavailable) {
+                    } else if (block._cmd == block_t::unavailable)
                         std::cout << "\n" << peers[choice].second << " is unavailable." << std::endl;
-                    }
                 }
             }
         }
