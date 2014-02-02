@@ -22,6 +22,7 @@
 #include <sstream>
 #include <iostream>
 #include <netdb.h>
+#include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <pthread.h>
